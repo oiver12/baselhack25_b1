@@ -81,8 +81,8 @@ export default function SuggestionsDisplay() {
     suggestions.forEach((suggestion, index) => {
       const existingBubble = bubbleDataRef.current.get(suggestion.title);
 
-      // Calculate bubble radius based on size (0-1) -> 50-140px (more exaggerated)
-      const radius = 50 + suggestion.size * 90;
+      // Calculate bubble radius based on size (0-1) -> 40-160px (highly exaggerated)
+      const radius = 40 + suggestion.size * 120;
 
       // Calculate child bubbles with better spacing
       const children: ChildBubble[] = [];
@@ -147,12 +147,20 @@ export default function SuggestionsDisplay() {
       if (existingBubble) {
         position = existingBubble.position;
       } else {
-        // New bubble - create initial position in a circle layout
-        const angle = (index / suggestions.length) * Math.PI * 2;
-        const distanceFromCenter = Math.min(width, height) * 0.25;
+        // New bubble - create initial position spread across canvas
+        const cols = Math.ceil(Math.sqrt(suggestions.length));
+        const row = Math.floor(index / cols);
+        const col = index % cols;
+        const cellWidth = width / cols;
+        const cellHeight = height / Math.ceil(suggestions.length / cols);
+
+        // Add some randomness to avoid perfect grid
+        const randomX = (Math.random() - 0.5) * cellWidth * 0.3;
+        const randomY = (Math.random() - 0.5) * cellHeight * 0.3;
+
         position = {
-          x: width / 2 + Math.cos(angle) * distanceFromCenter,
-          y: height / 2 + Math.sin(angle) * distanceFromCenter,
+          x: (col + 0.5) * cellWidth + randomX,
+          y: (row + 0.5) * cellHeight + randomY,
           vx: 0,
           vy: 0,
         };
@@ -205,7 +213,7 @@ export default function SuggestionsDisplay() {
         let fx = 0;
         let fy = 0;
 
-        // Center attraction (very weak)
+        // Center attraction (extremely weak to allow spreading)
         const centerX = width / 2;
         const centerY = height / 2;
         const dx = centerX - bubble.position.x;
@@ -213,36 +221,38 @@ export default function SuggestionsDisplay() {
         const distToCenter = Math.sqrt(dx * dx + dy * dy);
 
         if (distToCenter > 0) {
-          fx += (dx / distToCenter) * 0.003;
-          fy += (dy / distToCenter) * 0.003;
+          fx += (dx / distToCenter) * 0.001;
+          fy += (dy / distToCenter) * 0.001;
         }
 
-        // Repulsion from other bubbles (stronger spacing)
+        // Repulsion from other bubbles (very strong spacing)
         bubbles.forEach((other) => {
           if (other === bubble) return;
 
           const dx = bubble.position.x - other.position.x;
           const dy = bubble.position.y - other.position.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const minDist = bubble.radius + other.radius + 150;
+          // Account for child bubbles when calculating minimum distance
+          const childBuffer = 120; // Space for child bubbles
+          const minDist = bubble.radius + other.radius + childBuffer * 2;
 
           if (dist < minDist && dist > 0) {
-            const force = (minDist - dist) / minDist;
-            fx += (dx / dist) * force * 3.0;
-            fy += (dy / dist) * force * 3.0;
+            const force = ((minDist - dist) / minDist) * 5;
+            fx += (dx / dist) * force;
+            fy += (dy / dist) * force;
           }
         });
 
-        // Boundary forces
-        const margin = bubble.radius + 30;
+        // Boundary forces (account for child bubbles)
+        const margin = bubble.radius + 100; // Extra space for child bubbles
         if (bubble.position.x < margin)
-          fx += (margin - bubble.position.x) * 0.08;
+          fx += (margin - bubble.position.x) * 0.1;
         if (bubble.position.x > width - margin)
-          fx -= (bubble.position.x - (width - margin)) * 0.08;
+          fx -= (bubble.position.x - (width - margin)) * 0.1;
         if (bubble.position.y < margin)
-          fy += (margin - bubble.position.y) * 0.08;
+          fy += (margin - bubble.position.y) * 0.1;
         if (bubble.position.y > height - margin)
-          fy -= (bubble.position.y - (height - margin)) * 0.08;
+          fy -= (bubble.position.y - (height - margin)) * 0.1;
 
         // Update velocity with strong damping
         bubble.position.vx = (bubble.position.vx + fx) * 0.88;
@@ -650,7 +660,8 @@ export default function SuggestionsDisplay() {
                                 height={child.size * 2}
                                 className="rounded-full w-full h-full object-cover ring-2 ring-white/50"
                               />
-                              {child.data.classification === "sophisticated" && (
+                              {child.data.classification ===
+                                "sophisticated" && (
                                 <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg">
                                   <Star className="w-2.5 h-2.5 text-white fill-white" />
                                 </div>

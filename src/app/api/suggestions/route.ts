@@ -4,7 +4,7 @@ import type { Suggestion, SuggestionsResponse } from "@/lib/types";
 const baseSuggestions: SuggestionsResponse = [
   {
     title: "AI-powered local assistant",
-    size: 0.9,
+    size: 0.95,
     pros: [
       "Personalized support for civic services",
       "Leverages existing open data",
@@ -40,7 +40,7 @@ const baseSuggestions: SuggestionsResponse = [
   },
   {
     title: "City-wide volunteer app",
-    size: 0.74,
+    size: 0.65,
     pros: [
       "Connects NGOs with available volunteers",
       "Gamification keeps engagement high",
@@ -67,7 +67,7 @@ const baseSuggestions: SuggestionsResponse = [
   },
   {
     title: "Pop-up mobility insights",
-    size: 0.6,
+    size: 0.4,
     pros: [
       "Low hardware cost with e-ink displays",
       "Real-time adjustments based on traffic",
@@ -91,7 +91,7 @@ const baseSuggestions: SuggestionsResponse = [
   },
   {
     title: "Participatory budgeting map",
-    size: 0.48,
+    size: 0.25,
     pros: [
       "Highlights funded initiatives on an interactive map",
       "Helps citizens discover nearby projects",
