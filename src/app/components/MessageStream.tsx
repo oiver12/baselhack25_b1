@@ -44,9 +44,10 @@ export default function MessageStream() {
 
           setMessages((prev) => {
             const filtered = prev.filter((message) => message.expiresAt > now);
-            const updated = [...filtered, newMessage];
+            // Prepend new message to show at the top
+            const updated = [newMessage, ...filtered];
             if (updated.length > MAX_MESSAGES) {
-              return updated.slice(updated.length - MAX_MESSAGES);
+              return updated.slice(0, MAX_MESSAGES);
             }
             return updated;
           });
@@ -77,17 +78,6 @@ export default function MessageStream() {
     };
   }, []);
 
-  useEffect(() => {
-    // Auto-scroll to the bottom to show the newest message
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages]);
-
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/70 shadow-xl shadow-blue-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-white/10 dark:shadow-blue-900/15">
       <div className="rounded-t-3xl border-b border-white/50 bg-gradient-to-r from-white/80 via-white/60 to-white/80 px-5 py-4 dark:border-white/10 dark:from-white/10 dark:via-white/5 dark:to-white/10">
@@ -107,45 +97,49 @@ export default function MessageStream() {
           </div>
         </div>
       </div>
-      <div
-        ref={messagesContainerRef}
-        className="flex-1 space-y-3 overflow-y-auto px-5 py-6"
-      >
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200/60 bg-white/60 p-6 text-sm text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-500">
-            Waiting for fresh ideas...
-          </div>
-        ) : (
-          messages.map((message) => (
-            <article
-              key={message.id}
-              className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/90 p-4 shadow-lg shadow-blue-100/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:border-white/10 dark:bg-white/10 dark:shadow-blue-900/20"
-            >
-              <div className="absolute right-4 top-4 text-[10px] uppercase tracking-[0.32em] text-slate-400/70">
-                {new Date(message.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
-                  {message.user[0]?.toUpperCase()}
+      <div className="relative flex-1 overflow-hidden">
+        <div
+          ref={messagesContainerRef}
+          className="h-full space-y-3 overflow-y-auto px-5 py-6"
+        >
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200/60 bg-white/60 p-6 text-sm text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-500">
+              Waiting for fresh ideas...
+            </div>
+          ) : (
+            messages.map((message) => (
+              <article
+                key={message.id}
+                className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/90 p-4 shadow-lg shadow-blue-100/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:border-white/10 dark:bg-white/10 dark:shadow-blue-900/20"
+              >
+                <div className="absolute right-4 top-4 text-[10px] uppercase tracking-[0.32em] text-slate-400/70">
+                  {new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {message.user}
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
+                    {message.user[0]?.toUpperCase()}
                   </div>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {message.message}
-                  </p>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {message.user}
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      {message.message}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
-              </div>
-            </article>
-          ))
-        )}
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+        {/* Fade-out gradient at the bottom */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white/70 via-white/40 to-transparent dark:from-white/10 dark:via-white/5" />
       </div>
     </div>
   );
