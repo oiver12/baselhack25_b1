@@ -149,8 +149,8 @@ export default function MessageStream() {
                 opacity: message.isExiting ? undefined : stackOpacity,
               }}
             >
-              <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 max-w-sm">
-                <div className="flex items-center gap-0">
+              <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 w-sm">
+                <div className="flex items-center gap-2">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
                     {message.user[0]?.toUpperCase()}
                   </div>
