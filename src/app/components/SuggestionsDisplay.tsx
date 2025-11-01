@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { Star, ThumbsDown, ThumbsUp, TrendingDown } from "lucide-react";
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Suggestion,
-  SuggestionsResponse,
   SuggestionOpinion,
+  SuggestionsResponse,
 } from "@/lib/types";
 import { Star, TrendingDown, ThumbsUp, ThumbsDown } from "lucide-react";
 import Image from "next/image";
+import * as d3 from "d3-force";
 
 interface BubblePosition {
   x: number;
@@ -31,13 +34,21 @@ interface SuggestionBubbleData {
   radius: number;
   isHovered: boolean;
   isMoving: boolean; // Track if bubble is currently animated
-  isMoving: boolean; // Track if bubble is currently animated
 }
 
 interface HoveredBubbleState {
   type: "opinion" | "pros" | "cons";
   data: SuggestionOpinion | string[];
   position: { x: number; y: number };
+}
+
+interface D3Node {
+  x: number;
+  y: number;
+  vx?: number;
+  vy?: number;
+  radius: number;
+  data: SuggestionBubbleData;
 }
 
 export default function SuggestionsDisplay() {
@@ -47,20 +58,15 @@ export default function SuggestionsDisplay() {
   );
   const [hoveredParent, setHoveredParent] = useState<string | null>(null);
   const [stage, setStage] = useState(0);
-  const [stage, setStage] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | undefined>(undefined);
   const bubbleDataRef = useRef<Map<string, SuggestionBubbleData>>(new Map());
   const previousDataRef = useRef<Map<string, string>>(new Map());
   const [, setRenderTrigger] = useState(0);
 
   // Fetch suggestions every second, incrementing stage
-  // Fetch suggestions every second, incrementing stage
   useEffect(() => {
     async function fetchSuggestions(currentStage: number) {
-    async function fetchSuggestions(currentStage: number) {
       try {
-        const response = await fetch(`/api/suggestions?stage=${currentStage}`);
         const response = await fetch(`/api/suggestions?stage=${currentStage}`);
         const data: SuggestionsResponse = await response.json();
         setSuggestions(data);
@@ -73,13 +79,8 @@ export default function SuggestionsDisplay() {
     const interval = setInterval(() => {
       setStage((prev) => prev + 1);
     }, 1000);
-    fetchSuggestions(stage);
-    const interval = setInterval(() => {
-      setStage((prev) => prev + 1);
-    }, 1000);
 
     return () => clearInterval(interval);
-  }, [stage]);
   }, [stage]);
 
   // Initialize and update bubble data when suggestions change
@@ -96,17 +97,9 @@ export default function SuggestionsDisplay() {
     const sortedSuggestions = [...suggestions].sort((a, b) => b.size - a.size);
 
     sortedSuggestions.forEach((suggestion, index) => {
-    // Sort suggestions by size (largest first) for better packing
-    const sortedSuggestions = [...suggestions].sort((a, b) => b.size - a.size);
-
-    sortedSuggestions.forEach((suggestion, index) => {
       const existingBubble = bubbleDataRef.current.get(suggestion.title);
 
       // Calculate bubble radius based on size (0-1) -> 40-160px (highly exaggerated)
-      // Scale down if screen is too small
-      const baseRadius = 40 + suggestion.size * 120;
-      const maxAllowedRadius = Math.min(width, height) * 0.15; // Max 15% of smallest dimension
-      const radius = Math.min(baseRadius, maxAllowedRadius);
       // Scale down if screen is too small
       const baseRadius = 40 + suggestion.size * 120;
       const maxAllowedRadius = Math.min(width, height) * 0.15; // Max 15% of smallest dimension
@@ -171,10 +164,8 @@ export default function SuggestionsDisplay() {
       }
 
       // Position calculation - use existing position or create new one with circular layout
-      // Position calculation - use existing position or create new one with circular layout
       let position: BubblePosition;
       if (existingBubble) {
-        // Keep existing position
         // Keep existing position
         position = existingBubble.position;
       } else {
@@ -193,45 +184,16 @@ export default function SuggestionsDisplay() {
             vy: 0,
           };
         } else {
-          // Place new bubbles in expanding circles with MORE space
+          // Place new bubbles in expanding circles with MAXIMUM space
           const ring = Math.floor(Math.log2(index + 1));
-          const posInRing = index - (Math.pow(2, ring) - 1);
-          const bubblesInRing = Math.pow(2, ring);
+          const posInRing = index - (2 ** ring - 1);
+          const bubblesInRing = 2 ** ring;
           const angle = (posInRing / bubblesInRing) * Math.PI * 2;
-          // INCREASED distance for better spacing - use average of the two radii
-          const avgFullRadius = (fullRadius + (40 + 0.5 * 120 + 50 + 30 + 10)) / 2;
-          const distance = (ring + 1) * avgFullRadius * 2.5;
-          
-          let x = width / 2 + Math.cos(angle) * distance;
-          let y = height / 2 + Math.sin(angle) * distance;
+          // MASSIVELY increased distance for better spacing
+          const avgFullRadius =
+            (fullRadius + (40 + 0.5 * 120 + 50 + 30 + 10)) / 2;
+          const distance = (ring + 1) * avgFullRadius * 4.0; // Doubled from 2.5 to 4.0!
 
-          // Clamp to ensure bubble stays fully visible
-          x = Math.max(fullRadius, Math.min(width - fullRadius, x));
-          y = Math.max(fullRadius, Math.min(height - fullRadius, y));
-        // Calculate the full radius including child bubbles
-        const childDistance = 50;
-        const maxChildSize = 30;
-        const fullRadius = radius + childDistance + maxChildSize + 10;
-
-        // New bubble - place in circular pattern with LOTS of space
-        if (index === 0) {
-          // First bubble in center
-          position = {
-            x: width / 2,
-            y: height / 2,
-            vx: 0,
-            vy: 0,
-          };
-        } else {
-          // Place new bubbles in expanding circles with MORE space
-          const ring = Math.floor(Math.log2(index + 1));
-          const posInRing = index - (Math.pow(2, ring) - 1);
-          const bubblesInRing = Math.pow(2, ring);
-          const angle = (posInRing / bubblesInRing) * Math.PI * 2;
-          // INCREASED distance for better spacing - use average of the two radii
-          const avgFullRadius = (fullRadius + (40 + 0.5 * 120 + 50 + 30 + 10)) / 2;
-          const distance = (ring + 1) * avgFullRadius * 2.5;
-          
           let x = width / 2 + Math.cos(angle) * distance;
           let y = height / 2 + Math.sin(angle) * distance;
 
@@ -239,13 +201,6 @@ export default function SuggestionsDisplay() {
           x = Math.max(fullRadius, Math.min(width - fullRadius, x));
           y = Math.max(fullRadius, Math.min(height - fullRadius, y));
 
-          position = {
-            x,
-            y,
-            vx: 0,
-            vy: 0,
-          };
-        }
           position = {
             x,
             y,
@@ -255,7 +210,6 @@ export default function SuggestionsDisplay() {
         }
       }
 
-      const bubbleData = {
       const bubbleData = {
         suggestion,
         position,
@@ -266,259 +220,121 @@ export default function SuggestionsDisplay() {
       };
 
       newBubbleData.set(suggestion.title, bubbleData);
-        isMoving: !existingBubble, // New bubbles start as moving
-      };
-
-      newBubbleData.set(suggestion.title, bubbleData);
     });
 
     bubbleDataRef.current = newBubbleData;
     setRenderTrigger((prev) => prev + 1);
   }, [suggestions]);
 
-  // Physics simulation for bubble positioning with enhanced collision prevention
-  // Physics simulation for bubble positioning with enhanced collision prevention
+  // D3-Force physics simulation for professional collision prevention
   useEffect(() => {
     if (!containerRef.current || bubbleDataRef.current.size === 0) return;
 
     const container = containerRef.current;
-    let isRunning = true;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
 
-    // Constants for child bubble spacing - declared once here
+    // Constants for child bubble spacing
     const childDistance = 50;
     const maxChildSize = 30;
 
-    // Constants for child bubble spacing - declared once here
-    const childDistance = 50;
-    const maxChildSize = 30;
+    // Convert bubbles to d3 nodes
+    const bubbles = Array.from(bubbleDataRef.current.values());
+    const nodes: D3Node[] = bubbles.map((bubble) => ({
+      ...bubble.position,
+      radius: bubble.radius + childDistance + maxChildSize + 10, // Full extent for collision
+      data: bubble,
+    }));
 
-    const simulate = () => {
-      if (!isRunning) return;
+    // Create d3 force simulation with collision detection
+    const simulation = d3
+      .forceSimulation<D3Node>(nodes)
+      // COLLISION FORCE - prevents all overlaps!
+      .force(
+        "collide",
+        d3
+          .forceCollide<D3Node>()
+          .radius((d) => d.radius + 5) // Add padding
+          .strength(1) // Maximum collision strength
+          .iterations(3), // Multiple iterations for accuracy
+      )
+      // CENTER FORCE - gentle pull toward center
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.01))
+      // X/Y FORCES - keep bubbles within bounds
+      .force(
+        "x",
+        d3
+          .forceX<D3Node>(width / 2)
+          .strength(0.05)
+          .x((d) => {
+            const margin = d.radius;
+            return Math.max(margin, Math.min(width - margin, d.x));
+          }),
+      )
+      .force(
+        "y",
+        d3
+          .forceY<D3Node>(height / 2)
+          .strength(0.05)
+          .y((d) => {
+            const margin = d.radius;
+            return Math.max(margin, Math.min(height - margin, d.y));
+          }),
+      )
+      // Velocity decay for smooth animation
+      .velocityDecay(0.2)
+      .alphaDecay(0.01);
 
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      const bubbles = Array.from(bubbleDataRef.current.values());
+    // Update positions on each tick
+    simulation.on("tick", () => {
+      nodes.forEach((node) => {
+        const bubble = node.data;
 
-      // Apply forces - but pause for hovered bubbles
-      bubbles.forEach((bubble) => {
-        // Skip physics for hovered bubbles and their neighbors
+        // Skip physics for hovered bubbles
         if (bubble.isHovered) return;
 
-        // Check if any nearby bubble is hovered
+        // Check if nearby bubble is hovered
         const nearbyHovered = bubbles.some((other) => {
           if (!other.isHovered) return false;
-          const dx = bubble.position.x - other.position.x;
-          const dy = bubble.position.y - other.position.y;
+          const dx = node.x - other.position.x;
+          const dy = node.y - other.position.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          return dist < bubble.radius + other.radius + 200;
+          return dist < node.radius + other.radius + 100;
         });
 
         if (nearbyHovered) return;
 
-        // Reset forces
-        let fx = 0;
-        let fy = 0;
+        // Update bubble position from d3 simulation
+        bubble.position.x = node.x;
+        bubble.position.y = node.y;
+        bubble.position.vx = node.vx ?? 0;
+        bubble.position.vy = node.vy ?? 0;
 
-        // Center attraction (SUPER weak to allow maximum spreading)
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const dx = centerX - bubble.position.x;
-        const dy = centerY - bubble.position.y;
-        const distToCenter = Math.sqrt(dx * dx + dy * dy);
-
-        if (distToCenter > 0) {
-          fx += (dx / distToCenter) * 0.0005; // Reduced from 0.002
-          fy += (dy / distToCenter) * 0.0005;
-        }
-
-        // SUPER STRONG: Repulsion from other bubbles to prevent ANY overlap
-        // SUPER STRONG: Repulsion from other bubbles to prevent ANY overlap
-        bubbles.forEach((other) => {
-          if (other === bubble) return;
-
-          const dx = bubble.position.x - other.position.x;
-          const dy = bubble.position.y - other.position.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          // Prevent division by zero - if too close, apply max force
-          if (dist < 1) {
-            const randomAngle = Math.random() * Math.PI * 2;
-            fx += Math.cos(randomAngle) * 100;
-            fy += Math.sin(randomAngle) * 100;
-            return;
-          }
-          
-          // Account for FULL extent of both bubbles including their child bubbles
-          const myFullRadius = bubble.radius + childDistance + maxChildSize;
-          const otherFullRadius = other.radius + childDistance + maxChildSize;
-          const minDist = myFullRadius + otherFullRadius + 40; // Extra safety margin
-
-          if (dist < minDist) {
-            // EXTREMELY STRONG: Exponential force that's super aggressive
-            const overlap = minDist - dist;
-            const normalizedOverlap = overlap / minDist;
-            // Even stronger cubic falloff
-            const force = Math.pow(normalizedOverlap, 1.2) * 100 + 20;
-            fx += (dx / dist) * force;
-            fy += (dy / dist) * force;
-          } else if (dist < minDist * 2.0) {
-            // Even wider transition zone
-            const force = ((minDist * 2.0 - dist) / (minDist * 2.0)) * 5;
-          
-          // Prevent division by zero - if too close, apply max force
-          if (dist < 1) {
-            const randomAngle = Math.random() * Math.PI * 2;
-            fx += Math.cos(randomAngle) * 100;
-            fy += Math.sin(randomAngle) * 100;
-            return;
-          }
-          
-          // Account for FULL extent of both bubbles including their child bubbles
-          const myFullRadius = bubble.radius + childDistance + maxChildSize;
-          const otherFullRadius = other.radius + childDistance + maxChildSize;
-          const minDist = myFullRadius + otherFullRadius + 40; // Extra safety margin
-
-          if (dist < minDist) {
-            // EXTREMELY STRONG: Exponential force that's super aggressive
-            const overlap = minDist - dist;
-            const normalizedOverlap = overlap / minDist;
-            // Even stronger cubic falloff
-            const force = Math.pow(normalizedOverlap, 1.2) * 100 + 20;
-            fx += (dx / dist) * force;
-            fy += (dy / dist) * force;
-          } else if (dist < minDist * 2.0) {
-            // Even wider transition zone
-            const force = ((minDist * 2.0 - dist) / (minDist * 2.0)) * 5;
-            fx += (dx / dist) * force;
-            fy += (dy / dist) * force;
-          }
-        });
-
-        // ENHANCED: Stronger boundary forces to keep everything visible
-        const margin = bubble.radius + childDistance + maxChildSize + 20; // Full extent + extra padding
-
-        if (bubble.position.x < margin) {
-          const overlap = margin - bubble.position.x;
-          fx += overlap * 0.8; // Even stronger to prevent escaping
-        }
-        if (bubble.position.x > width - margin) {
-          const overlap = bubble.position.x - (width - margin);
-          fx -= overlap * 0.8;
-        }
-        if (bubble.position.y < margin) {
-          const overlap = margin - bubble.position.y;
-          fy += overlap * 0.8;
-        }
-        if (bubble.position.y > height - margin) {
-          const overlap = bubble.position.y - (height - margin);
-          fy -= overlap * 0.8;
-        }
-        // ENHANCED: Stronger boundary forces to keep everything visible
-        const margin = bubble.radius + childDistance + maxChildSize + 20; // Full extent + extra padding
-
-        if (bubble.position.x < margin) {
-          const overlap = margin - bubble.position.x;
-          fx += overlap * 0.8; // Even stronger to prevent escaping
-        }
-        if (bubble.position.x > width - margin) {
-          const overlap = bubble.position.x - (width - margin);
-          fx -= overlap * 0.8;
-        }
-        if (bubble.position.y < margin) {
-          const overlap = margin - bubble.position.y;
-          fy += overlap * 0.8;
-        }
-        if (bubble.position.y > height - margin) {
-          const overlap = bubble.position.y - (height - margin);
-          fy -= overlap * 0.8;
-        }
-
-        // Update velocity with minimal damping to allow FAST separation
+        // Track movement for animation
         const speed = Math.sqrt(
           bubble.position.vx * bubble.position.vx +
             bubble.position.vy * bubble.position.vy,
         );
-        const damping = speed > 15 ? 0.90 : 0.94; // Even less damping = faster movement
+        bubble.isMoving = speed > 0.5;
 
-        bubble.position.vx = (bubble.position.vx + fx) * damping;
-        bubble.position.vy = (bubble.position.vy + fy) * damping;
-
-        // Cap maximum velocity - INCREASED EVEN MORE for faster separation
-        const maxVelocity = 20;
-        const currentSpeed = Math.sqrt(
-          bubble.position.vx * bubble.position.vx +
-            bubble.position.vy * bubble.position.vy,
-        );
-        if (currentSpeed > maxVelocity) {
-          bubble.position.vx =
-            (bubble.position.vx / currentSpeed) * maxVelocity;
-          bubble.position.vy =
-            (bubble.position.vy / currentSpeed) * maxVelocity;
-        }
-
-        // Track if bubble is actively moving (for animation effects)
-        bubble.isMoving = currentSpeed > 0.5;
-        // Update velocity with minimal damping to allow FAST separation
-        const speed = Math.sqrt(
-          bubble.position.vx * bubble.position.vx +
-            bubble.position.vy * bubble.position.vy,
-        );
-        const damping = speed > 15 ? 0.90 : 0.94; // Even less damping = faster movement
-
-        bubble.position.vx = (bubble.position.vx + fx) * damping;
-        bubble.position.vy = (bubble.position.vy + fy) * damping;
-
-        // Cap maximum velocity - INCREASED EVEN MORE for faster separation
-        const maxVelocity = 20;
-        const currentSpeed = Math.sqrt(
-          bubble.position.vx * bubble.position.vx +
-            bubble.position.vy * bubble.position.vy,
-        );
-        if (currentSpeed > maxVelocity) {
-          bubble.position.vx =
-            (bubble.position.vx / currentSpeed) * maxVelocity;
-          bubble.position.vy =
-            (bubble.position.vy / currentSpeed) * maxVelocity;
-        }
-
-        // Track if bubble is actively moving (for animation effects)
-        bubble.isMoving = currentSpeed > 0.5;
-
-        // Update position
-        bubble.position.x += bubble.position.vx;
-        bubble.position.y += bubble.position.vy;
-
-        // Clamp to bounds - account for child bubbles to keep EVERYTHING visible
-        const fullRadius = bubble.radius + childDistance + maxChildSize + 10; // Total space needed
-
-        // Clamp to bounds - account for child bubbles to keep EVERYTHING visible
-        const fullRadius = bubble.radius + childDistance + maxChildSize + 10; // Total space needed
-
+        // Clamp to bounds to ensure visibility
+        const fullRadius = bubble.radius + childDistance + maxChildSize + 10;
         bubble.position.x = Math.max(
-          fullRadius,
-          Math.min(width - fullRadius, bubble.position.x),
           fullRadius,
           Math.min(width - fullRadius, bubble.position.x),
         );
         bubble.position.y = Math.max(
           fullRadius,
           Math.min(height - fullRadius, bubble.position.y),
-          fullRadius,
-          Math.min(height - fullRadius, bubble.position.y),
         );
       });
 
       setRenderTrigger((prev) => prev + 1);
-      animationFrameRef.current = requestAnimationFrame(simulate);
-    };
+    });
 
-    simulate();
-
+    // Cleanup
     return () => {
-      isRunning = false;
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      simulation.stop();
     };
   }, []);
 
@@ -654,64 +470,11 @@ export default function SuggestionsDisplay() {
 
         {bubbleData.map((bubble) => {
           const { suggestion, position, children, radius, isMoving } = bubble;
-          const { suggestion, position, children, radius, isMoving } = bubble;
           const isParentHovered = hoveredParent === suggestion.title;
           const childDistance = radius + 50;
 
           return (
             <g key={suggestion.title}>
-              {/* Animated glow ring when moving - fancy effect! */}
-              {isMoving && (
-                <>
-                  <circle
-                    cx={position.x}
-                    cy={position.y}
-                    r={radius + childDistance + 80}
-                    fill="none"
-                    stroke="url(#gradient-blue)"
-                    strokeWidth="3"
-                    opacity="0.2"
-                    className="animate-pulse"
-                  >
-                    <animate
-                      attributeName="r"
-                      values={`${radius + childDistance + 60};${radius + childDistance + 90};${radius + childDistance + 60}`}
-                      dur="2s"
-                      repeatCount="indefinite"
-                    />
-                    <animate
-                      attributeName="opacity"
-                      values="0.3;0.1;0.3"
-                      dur="2s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  <circle
-                    cx={position.x}
-                    cy={position.y}
-                    r={radius + 15}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2"
-                    opacity="0.4"
-                    className="dark:stroke-white/30"
-                  >
-                    <animate
-                      attributeName="r"
-                      values={`${radius + 10};${radius + 20};${radius + 10}`}
-                      dur="1.5s"
-                      repeatCount="indefinite"
-                    />
-                    <animate
-                      attributeName="opacity"
-                      values="0.5;0.2;0.5"
-                      dur="1.5s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                </>
-              )}
-
               {/* Animated glow ring when moving - fancy effect! */}
               {isMoving && (
                 <>
@@ -851,13 +614,10 @@ export default function SuggestionsDisplay() {
                   fill="url(#gradient-blue)"
                   className={`transition-all duration-300 pointer-events-none ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${isMoving ? "drop-shadow-2xl" : ""}`}
                   filter={isParentHovered || isMoving ? "url(#soft-glow)" : ""}
-                  className={`transition-all duration-300 pointer-events-none ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${isMoving ? "drop-shadow-2xl" : ""}`}
-                  filter={isParentHovered || isMoving ? "url(#soft-glow)" : ""}
                   style={{
                     transform: isParentHovered ? "scale(1.05)" : "scale(1)",
                     transformOrigin: `${position.x}px ${position.y}px`,
                   }}
-                  opacity={isMoving ? "0.95" : "1"}
                   opacity={isMoving ? "0.95" : "1"}
                 />
 
@@ -879,12 +639,6 @@ export default function SuggestionsDisplay() {
                   className="pointer-events-none"
                 >
                   <div className="w-full h-full flex items-center justify-center p-6">
-                    <div
-                      className="text-center text-white font-bold leading-snug break-words drop-shadow-md"
-                      style={{
-                        fontSize: `${Math.max(12, Math.min(24, radius * 0.25 - suggestion.title.length * 0.15))}px`,
-                      }}
-                    >
                     <div
                       className="text-center text-white font-bold leading-snug break-words drop-shadow-md"
                       style={{
