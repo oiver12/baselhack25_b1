@@ -9,6 +9,7 @@ from app.config import settings
 from app.discord_bot.commands import handle_start_discussion
 from app.state import DiscordMessage, add_message_to_question
 from app.services.summary_service import process_single_message_for_question
+from app.services.question_service import assign_one_message_to_existing_questions
 
 
 class ConsensusBot(discord.Client):
@@ -83,7 +84,7 @@ class ConsensusBot(discord.Client):
             from app.services.question_service import assign_messages_to_existing_questions
             
             # Assign this single new message to an existing question (don't create new questions)
-            question_ids = await assign_messages_to_existing_questions([discord_message], allow_new_questions=False)
+            question_ids = await assign_one_message_to_existing_questions(discord_message, allow_new_questions=False)
             
             # Get the assigned question_id from the message
             if discord_message.question_id:
