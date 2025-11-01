@@ -9,6 +9,10 @@ import type {
 import { Star, TrendingDown, ThumbsUp, ThumbsDown } from "lucide-react";
 import Image from "next/image";
 import * as d3 from "d3-force";
+import AnalyticsDashboard from "./AnalyticsDashboard";
+
+// Toggle between mock and real backend
+const USE_MOCK_BACKEND = true;
 
 interface BubblePosition {
   x: number;
@@ -49,38 +53,106 @@ interface D3Node {
   data: SuggestionBubbleData;
 }
 
-export default function SuggestionsDisplay() {
+interface SuggestionsDisplayProps {
+  questionId: string;
+}
+
+export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayProps) {
   const [suggestions, setSuggestions] = useState<SuggestionsResponse>([]);
+  const [questionText, setQuestionText] = useState<string>("");
   const [hoveredBubble, setHoveredBubble] = useState<HoveredBubbleState | null>(
     null,
   );
   const [hoveredParent, setHoveredParent] = useState<string | null>(null);
-  const [stage, setStage] = useState(0);
   const [bubbleCount, setBubbleCount] = useState(0);
+  const [stage, setStage] = useState(0); // Local state for stage, starts at 0
   const containerRef = useRef<HTMLDivElement>(null);
   const bubbleDataRef = useRef<Map<string, SuggestionBubbleData>>(new Map());
   const previousDataRef = useRef<Map<string, string>>(new Map());
   const [, setRenderTrigger] = useState(0);
 
-  // Fetch suggestions every second, incrementing stage
+  // Auto-increment stage parameter every 2 seconds
   useEffect(() => {
-    async function fetchSuggestions(currentStage: number) {
+    if (!USE_MOCK_BACKEND) return; // Only auto-increment for mock backend
+    
+    const interval = setInterval(() => {
+      setStage((prevStage) => prevStage + 1);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch question text
+  useEffect(() => {
+    if (!questionId) return;
+
+    async function fetchQuestion() {
       try {
-        const response = await fetch(`/api/suggestions?stage=${currentStage}`);
-        const data: SuggestionsResponse = await response.json();
-        setSuggestions(data);
+        if (USE_MOCK_BACKEND) {
+          // Use mock question for mock backend
+          setQuestionText("How should we improve the city's public transportation system to better serve all residents?");
+        } else {
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+          const response = await fetch(`${backendUrl}/api/dashboard/${questionId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setQuestionText(data.question || "");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch question:", error);
+      }
+    }
+
+    fetchQuestion();
+  }, [questionId]);
+
+  // Fetch suggestions from Python backend every second
+  useEffect(() => {
+    if (!questionId) return;
+
+    async function fetchSuggestions() {
+      try {
+        if (USE_MOCK_BACKEND) {
+          // Use mock backend - Next.js API route
+          const response = await fetch(`/api/suggestions?stage=${stage}`);
+          if (!response.ok) {
+            throw new Error(`Mock backend failed: ${response.statusText}`);
+          }
+          const data: SuggestionsResponse = await response.json();
+          setSuggestions(data || []);
+        } else {
+          // Use real backend
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api";
+          
+          // Call messages endpoint first (ignore output, just needs to be called)
+          await fetch(`${backendUrl}/messages`).catch(() => {
+            // Ignore errors from messages endpoint
+          });
+          
+          // Call Python backend directly - baselhack25_backend/app/api/routes/dashboard.py
+          const response = await fetch(`${backendUrl}/dashboard/${questionId}`);
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.log("Question not found yet, waiting...");
+              return;
+            }
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.detail || `Failed: ${response.statusText}`);
+          }
+          const data: SuggestionsResponse = await response.json();
+          setSuggestions(data || []);
+        }
       } catch (error) {
         console.error("Failed to fetch suggestions:", error);
       }
     }
 
-    fetchSuggestions(stage);
-    const interval = setInterval(() => {
-      setStage((prev) => prev + 1);
-    }, 1000);
+    fetchSuggestions();
+    const interval = setInterval(fetchSuggestions, 1000);
 
     return () => clearInterval(interval);
-  }, [stage]);
+  }, [questionId, stage]);
 
   // Initialize and update bubble data when suggestions change
   useEffect(() => {
@@ -111,14 +183,33 @@ export default function SuggestionsDisplay() {
         (suggestion.pros.length > 0 ? 1 : 0) +
         (suggestion.contra.length > 0 ? 1 : 0);
 
+      // Create a consistent random starting angle for this specific suggestion
+      // Use a hash of the title to get a deterministic but varied starting angle
+      const titleHash = suggestion.title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      // Vary starting angle from -90° to 270° (full circle rotation)
+      const baseStartAngle = (titleHash % 360) * (Math.PI / 180) - Math.PI / 2;
+      
+      // Add some randomness to spacing between children (not perfectly even)
+      const spacingVariation = 0.2; // 20% variation in spacing
+
       let childIndex = 0;
+
+      // Helper function to get deterministic spacing offset based on child ID
+      const getSpacingOffset = (childId: string, index: number) => {
+        const idHash = childId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const normalized = (idHash % 100) / 100; // 0-1
+        return (normalized - 0.5) * spacingVariation * (Math.PI * 2 / totalChildren);
+      };
 
       // Add opinion bubbles
       suggestion.peopleOpinions.forEach((opinion) => {
+        const childId = `${suggestion.title}-opinion-${opinion.name}`;
+        const baseAngle = (childIndex / totalChildren) * Math.PI * 2;
+        const spacingOffset = getSpacingOffset(childId, childIndex);
         children.push({
-          id: `${suggestion.title}-opinion-${opinion.name}`,
+          id: childId,
           type: "opinion",
-          angle: (childIndex / totalChildren) * Math.PI * 2 - Math.PI / 2, // Start from top
+          angle: baseAngle + baseStartAngle + spacingOffset,
           data: opinion,
           size: 25,
         });
@@ -127,10 +218,13 @@ export default function SuggestionsDisplay() {
 
       // Add pros bubble
       if (suggestion.pros.length > 0) {
+        const childId = `${suggestion.title}-pros`;
+        const baseAngle = (childIndex / totalChildren) * Math.PI * 2;
+        const spacingOffset = getSpacingOffset(childId, childIndex);
         children.push({
-          id: `${suggestion.title}-pros`,
+          id: childId,
           type: "pros",
-          angle: (childIndex / totalChildren) * Math.PI * 2 - Math.PI / 2,
+          angle: baseAngle + baseStartAngle + spacingOffset,
           data: suggestion.pros,
           size: 30,
         });
@@ -139,10 +233,13 @@ export default function SuggestionsDisplay() {
 
       // Add cons bubble
       if (suggestion.contra.length > 0) {
+        const childId = `${suggestion.title}-cons`;
+        const baseAngle = (childIndex / totalChildren) * Math.PI * 2;
+        const spacingOffset = getSpacingOffset(childId, childIndex);
         children.push({
-          id: `${suggestion.title}-cons`,
+          id: childId,
           type: "cons",
-          angle: (childIndex / totalChildren) * Math.PI * 2 - Math.PI / 2,
+          angle: baseAngle + baseStartAngle + spacingOffset,
           data: suggestion.contra,
           size: 30,
         });
@@ -176,12 +273,15 @@ export default function SuggestionsDisplay() {
         // Add randomness to initial position
         const randomDistance = Math.random() * 100 + 50; // Random offset 50-150px
 
+        // Header exclusion zone for initial placement - ensure full bubble radius is below header
+        const headerExclusionHeight = 130; // Header height + extra padding to account for bubble radii
+
         // New bubble - place in circular pattern with randomness
         if (index === 0) {
-          // First bubble in center with small random offset
+          // First bubble in center with small random offset, but below header (center + radius)
           position = {
             x: width / 2 + (Math.random() - 0.5) * 40,
-            y: height / 2 + (Math.random() - 0.5) * 40,
+            y: Math.max(height / 2 + (Math.random() - 0.5) * 40, headerExclusionHeight + fullRadius),
             vx: 0,
             vy: 0,
           };
@@ -209,9 +309,9 @@ export default function SuggestionsDisplay() {
             Math.sin(angle) * distance +
             (Math.random() - 0.5) * randomDistance;
 
-          // Clamp to ensure bubble stays fully visible
+          // Clamp to ensure bubble stays fully visible and below header (bubble center must be headerHeight + fullRadius from top)
           x = Math.max(fullRadius, Math.min(width - fullRadius, x));
-          y = Math.max(fullRadius, Math.min(height - fullRadius, y));
+          y = Math.max(headerExclusionHeight + fullRadius, Math.min(height - fullRadius, y));
 
           position = {
             x,
@@ -252,6 +352,37 @@ export default function SuggestionsDisplay() {
     const childDistance = 50;
     const maxChildSize = 30;
     const padding = 15; // Extra padding between bubbles
+
+    // Get analytics exclusion zone from container
+    let exclusionZone: { x: number; y: number; width: number; height: number } | null = null;
+    try {
+      const exclusionData = container.getAttribute('data-analytics-exclusion');
+      if (exclusionData) {
+        const parsed = JSON.parse(exclusionData);
+        if (parsed.width > 0 && parsed.height > 0) {
+          // Add padding around analytics panel
+          const exclusionPadding = 30;
+          exclusionZone = {
+            x: parsed.x - exclusionPadding,
+            y: parsed.y - exclusionPadding,
+            width: parsed.width + exclusionPadding * 2,
+            height: parsed.height + exclusionPadding * 2,
+          };
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    // Header exclusion zone - prevent bubbles from going into header area
+    // Make it larger to account for full bubble radius
+    const headerHeight = 80; // Approximate header height with padding
+    const headerExclusionZone = {
+      x: 0,
+      y: 0,
+      width: width,
+      height: headerHeight + 50, // Extra padding to account for bubble radii
+    };
 
     // Convert bubbles to d3 nodes
     const bubbles = Array.from(bubbleDataRef.current.values());
@@ -372,6 +503,45 @@ export default function SuggestionsDisplay() {
         node.x = Math.max(fullRadius, Math.min(width - fullRadius, node.x));
         node.y = Math.max(fullRadius, Math.min(height - fullRadius, node.y));
 
+        // Push away from header exclusion zone
+        const headerExclusionBottom = headerExclusionZone.y + headerExclusionZone.height;
+        // Check if bubble (including its full radius) would overlap header
+        if (node.y - fullRadius < headerExclusionBottom) {
+          // Calculate how much we need to push down
+          const overlap = headerExclusionBottom - (node.y - fullRadius);
+          if (overlap > 0) {
+            // Strong push force to move bubble down
+            const pushForce = overlap * 0.5;
+            node.vy = (node.vy || 0) + pushForce;
+            // Clamp position to keep bubble fully below header
+            node.y = Math.max(headerExclusionBottom + fullRadius + 10, node.y);
+          }
+        }
+
+        // Push away from analytics exclusion zone
+        if (exclusionZone) {
+          const exCenterX = exclusionZone.x + exclusionZone.width / 2;
+          const exCenterY = exclusionZone.y + exclusionZone.height / 2;
+          const exRadius = Math.sqrt(exclusionZone.width ** 2 + exclusionZone.height ** 2) / 2 + fullRadius + 20;
+          
+          const dx = node.x - exCenterX;
+          const dy = node.y - exCenterY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < exRadius) {
+            // Push away from exclusion zone
+            const pushForce = ((exRadius - dist) / dist) * 0.5;
+            node.vx = (node.vx || 0) + dx * pushForce;
+            node.vy = (node.vy || 0) + dy * pushForce;
+            
+            // Also clamp to keep outside exclusion zone
+            const angle = Math.atan2(dy, dx);
+            const minDist = exRadius;
+            node.x = exCenterX + Math.cos(angle) * minDist;
+            node.y = exCenterY + Math.sin(angle) * minDist;
+          }
+        }
+
         // Update bubble position from d3 simulation
         bubble.position.x = node.x;
         bubble.position.y = node.y;
@@ -431,19 +601,36 @@ export default function SuggestionsDisplay() {
   if (suggestions.length === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div 
-            className="w-16 h-16 border-4 rounded-full animate-spin"
-            style={{
-              borderColor: "var(--theme-loading-border)",
-              borderTopColor: "var(--theme-loading-border-active)",
-            }}
-          />
-          <div 
-            className="text-lg font-medium"
-            style={{ color: "var(--theme-fg-secondary)" }}
-          >
-            Loading suggestions...
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div 
+              className="w-20 h-20 border-4 rounded-full animate-spin"
+              style={{
+                borderColor: "var(--theme-loading-border)",
+                borderTopColor: "var(--theme-loading-border-active)",
+                borderRightColor: "var(--theme-loading-border-active)",
+              }}
+            />
+            <div 
+              className="absolute inset-0 w-20 h-20 rounded-full animate-ping opacity-20"
+              style={{
+                backgroundColor: "var(--theme-loading-border-active)",
+              }}
+            />
+          </div>
+          <div className="text-center space-y-2">
+            <div 
+              className="text-xl font-semibold"
+              style={{ color: "var(--theme-fg-primary)" }}
+            >
+              Analyzing responses...
+            </div>
+            <div 
+              className="text-sm opacity-70"
+              style={{ color: "var(--theme-fg-secondary)" }}
+            >
+              Building consensus visualization
+            </div>
           </div>
         </div>
       </div>
@@ -455,7 +642,7 @@ export default function SuggestionsDisplay() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden rounded-3xl shadow-2xl"
+      className="w-full h-full relative overflow-hidden"
       style={{
         background: "linear-gradient(to bottom right, var(--theme-bg-secondary), var(--theme-bg-primary), var(--theme-bg-secondary))",
       }}
@@ -682,7 +869,7 @@ export default function SuggestionsDisplay() {
                 <circle
                   cx={position.x}
                   cy={position.y}
-                  r={radius + 6}
+                  r={radius}
                   fill="var(--theme-glass-white)"
                   fillOpacity="0.3"
                   className="pointer-events-none"
@@ -809,7 +996,7 @@ export default function SuggestionsDisplay() {
                     <circle
                       cx={childX}
                       cy={childY}
-                      r={child.size + 4}
+                      r={child.size}
                       fill="var(--theme-glass-white)"
                       fillOpacity="0.3"
                       className="pointer-events-none"
@@ -914,6 +1101,13 @@ export default function SuggestionsDisplay() {
         })}
       </svg>
 
+      {/* Analytics Dashboard */}
+      <AnalyticsDashboard 
+        suggestions={suggestions} 
+        questionText={questionText}
+        containerRef={containerRef}
+      />
+
       {/* Hover tooltip - modern card */}
       {hoveredBubble && (
         <div
@@ -925,102 +1119,136 @@ export default function SuggestionsDisplay() {
           }}
         >
           <div 
-            className="backdrop-blur-xl rounded-2xl shadow-2xl border p-5 max-w-sm animate-in fade-in zoom-in-95 duration-200"
+            className="backdrop-blur-xl rounded-2xl shadow-2xl border p-6 max-w-sm animate-in fade-in zoom-in-95 duration-300"
             style={{
-              backgroundColor: "var(--theme-message-bg)",
-              borderColor: "var(--theme-message-border)",
+              backgroundColor: "var(--theme-bg-primary)",
+              borderColor: "var(--theme-bg-tertiary)",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--theme-bg-tertiary)",
             }}
           >
+            {/* Subtle gradient overlay */}
+            <div 
+              className="absolute inset-0 rounded-2xl opacity-50 pointer-events-none"
+              style={{
+                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05), transparent)",
+              }}
+            />
+            <div className="relative">
             {hoveredBubble.type === "opinion" &&
               typeof hoveredBubble.data === "object" &&
               "name" in hoveredBubble.data && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="relative shrink-0">
                       <Image
                         src={hoveredBubble.data.profilePicUrl}
                         alt={hoveredBubble.data.name}
-                        width={48}
-                        height={48}
-                        className="rounded-full ring-2 ring-indigo-400/50"
+                        width={56}
+                        height={56}
+                        className="rounded-xl shadow-lg ring-2 ring-indigo-400/30"
                         unoptimized
                       />
                       <div 
-                        className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white"
                         style={{ backgroundColor: "var(--theme-bg-primary)" }}
                       >
                         {hoveredBubble.data.classification ===
                           "sophisticated" && (
                           <Star 
-                            className="w-3 h-3 fill-yellow-500" 
+                            className="w-3.5 h-3.5 fill-yellow-400" 
                             style={{ color: "var(--theme-accent-yellow)" }}
                           />
                         )}
                         {hoveredBubble.data.classification === "simple" && (
                           <TrendingDown 
-                            className="w-3 h-3" 
+                            className="w-3.5 h-3.5" 
                             style={{ color: "var(--theme-accent-red)" }}
                           />
                         )}
                       </div>
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0 pt-1">
                       <div 
-                        className="font-bold"
+                        className="font-bold text-base mb-1"
                         style={{ color: "var(--theme-fg-primary)" }}
                       >
                         {hoveredBubble.data.name}
                       </div>
                       <div 
-                        className="text-xs capitalize"
-                        style={{ color: "var(--theme-fg-secondary)" }}
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize"
+                        style={{ 
+                          backgroundColor: hoveredBubble.data.classification === "sophisticated" 
+                            ? "rgba(16, 185, 129, 0.1)" 
+                            : "rgba(239, 68, 68, 0.1)",
+                          color: hoveredBubble.data.classification === "sophisticated"
+                            ? "var(--theme-accent-green)"
+                            : "var(--theme-accent-red)",
+                        }}
                       >
                         {hoveredBubble.data.classification} opinion
                       </div>
                     </div>
                   </div>
-                  <p 
-                    className="text-sm leading-relaxed"
-                    style={{ color: "var(--theme-fg-secondary)" }}
+                  <div 
+                    className="relative pl-4 border-l-2"
+                    style={{
+                      borderColor: "var(--theme-bg-tertiary)",
+                    }}
                   >
-                    "{hoveredBubble.data.message}"
-                  </p>
+                    <p 
+                      className="text-sm leading-relaxed italic"
+                      style={{ color: "var(--theme-fg-secondary)" }}
+                    >
+                      "{hoveredBubble.data.message}"
+                    </p>
+                  </div>
                 </div>
               )}
 
             {hoveredBubble.type === "pros" &&
               Array.isArray(hoveredBubble.data) && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
                     <div 
-                      className="w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center"
+                      className="w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg"
                       style={{
-                        background: `linear-gradient(to bottom right, var(--theme-bubble-pros-from), var(--theme-bubble-pros-to))`,
+                        background: `linear-gradient(135deg, var(--theme-bubble-pros-from), var(--theme-bubble-pros-to))`,
                       }}
                     >
-                      <ThumbsUp className="w-4 h-4 text-white" />
+                      <ThumbsUp className="w-5 h-5 text-white" />
                     </div>
-                    <div 
-                      className="font-bold text-lg"
-                      style={{ color: "var(--theme-accent-green)" }}
-                    >
-                      Advantages
-                    </div>
-                  </div>
-                  <ul className="space-y-2">
-                    {hoveredBubble.data.map((pro: string) => (
-                      <li
-                        key={`pro-${pro.substring(0, 20)}`}
-                        className="flex items-start gap-2 text-sm"
+                    <div>
+                      <div 
+                        className="font-bold text-lg"
+                        style={{ color: "var(--theme-accent-green)" }}
+                      >
+                        Advantages
+                      </div>
+                      <div 
+                        className="text-xs opacity-70"
                         style={{ color: "var(--theme-fg-secondary)" }}
                       >
-                        <span 
-                          className="font-bold mt-0.5"
-                          style={{ color: "var(--theme-accent-green)" }}
+                        {hoveredBubble.data.length} {hoveredBubble.data.length === 1 ? 'point' : 'points'}
+                      </div>
+                    </div>
+                  </div>
+                  <ul className="space-y-2.5">
+                    {hoveredBubble.data.map((pro: string, index: number) => (
+                      <li
+                        key={`pro-${index}-${pro.substring(0, 20)}`}
+                        className="flex items-start gap-3 text-sm"
+                        style={{ color: "var(--theme-fg-secondary)" }}
+                      >
+                        <div 
+                          className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold text-xs"
+                          style={{ 
+                            backgroundColor: "rgba(16, 185, 129, 0.1)",
+                            color: "var(--theme-accent-green)",
+                          }}
                         >
                           ✓
-                        </span>
-                        <span>{pro}</span>
+                        </div>
+                        <span className="leading-relaxed">{pro}</span>
                       </li>
                     ))}
                   </ul>
@@ -1029,42 +1257,54 @@ export default function SuggestionsDisplay() {
 
             {hoveredBubble.type === "cons" &&
               Array.isArray(hoveredBubble.data) && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
                     <div 
-                      className="w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center"
+                      className="w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg"
                       style={{
-                        background: `linear-gradient(to bottom right, var(--theme-bubble-cons-from), var(--theme-bubble-cons-to))`,
+                        background: `linear-gradient(135deg, var(--theme-bubble-cons-from), var(--theme-bubble-cons-to))`,
                       }}
                     >
-                      <ThumbsDown className="w-4 h-4 text-white" />
+                      <ThumbsDown className="w-5 h-5 text-white" />
                     </div>
-                    <div 
-                      className="font-bold text-lg"
-                      style={{ color: "var(--theme-accent-red)" }}
-                    >
-                      Challenges
-                    </div>
-                  </div>
-                  <ul className="space-y-2">
-                    {hoveredBubble.data.map((con: string) => (
-                      <li
-                        key={`con-${con.substring(0, 20)}`}
-                        className="flex items-start gap-2 text-sm"
+                    <div>
+                      <div 
+                        className="font-bold text-lg"
+                        style={{ color: "var(--theme-accent-red)" }}
+                      >
+                        Challenges
+                      </div>
+                      <div 
+                        className="text-xs opacity-70"
                         style={{ color: "var(--theme-fg-secondary)" }}
                       >
-                        <span 
-                          className="font-bold mt-0.5"
-                          style={{ color: "var(--theme-accent-red)" }}
+                        {hoveredBubble.data.length} {hoveredBubble.data.length === 1 ? 'point' : 'points'}
+                      </div>
+                    </div>
+                  </div>
+                  <ul className="space-y-2.5">
+                    {hoveredBubble.data.map((con: string, index: number) => (
+                      <li
+                        key={`con-${index}-${con.substring(0, 20)}`}
+                        className="flex items-start gap-3 text-sm"
+                        style={{ color: "var(--theme-fg-secondary)" }}
+                      >
+                        <div 
+                          className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold text-xs"
+                          style={{ 
+                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            color: "var(--theme-accent-red)",
+                          }}
                         >
                           ✗
-                        </span>
-                        <span>{con}</span>
+                        </div>
+                        <span className="leading-relaxed">{con}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
+            </div>
           </div>
         </div>
       )}

@@ -15,13 +15,15 @@ const MAX_VISIBLE_TOASTS = 5;
 const EXIT_ANIMATION_DURATION = 300; // 300ms for fade out
 const SIMULTANEOUS_THRESHOLD = 500; // Messages within 500ms are considered simultaneous
 
-export default function MessageStream() {
+interface MessageStreamProps {
+  uuid: string;
+}
+
+export default function MessageStream({ uuid }: MessageStreamProps) {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
-    const ws = new WebSocket(
-      "ws://127.0.0.1:8000/ws/58eebf50-0df4-498c-9b83-99767bcb15f1",
-    );
+    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${uuid}`);
 
     ws.onopen = () => {
       console.log("WebSocket connected");
@@ -111,7 +113,7 @@ export default function MessageStream() {
         ws.close();
       }
     };
-  }, []);
+  }, [uuid]);
 
   if (messages.length === 0) {
     return null;
@@ -162,41 +164,57 @@ export default function MessageStream() {
               }}
             >
               <article 
-                className="group relative overflow-hidden rounded-2xl border backdrop-blur-2xl p-4 shadow-2xl transition-all duration-300 w-sm"
+                className="group relative overflow-hidden rounded-2xl border backdrop-blur-xl p-5 shadow-2xl transition-all duration-300 w-80 md:w-96"
                 style={{
-                  borderColor: "var(--theme-message-border)",
-                  backgroundColor: "var(--theme-message-bg)",
-                  boxShadow: "0 25px 50px -12px var(--theme-message-shadow)",
+                  borderColor: "rgba(255, 255, 255, 0.18)",
+                  backgroundColor: "rgba(255, 255, 255, 0.75)",
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5)",
                 }}
               >
-                <div className="flex items-center gap-2">
-                  {message.profilePicUrl ? (
-                    <img
-                      src={message.profilePicUrl}
-                      alt={message.user}
-                      className="h-10 w-10 shrink-0 rounded-full object-cover shadow-md"
-                    />
-                  ) : (
-                    <div 
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-semibold text-white shadow-md"
-                      style={{
-                        background: `linear-gradient(to bottom right, var(--theme-accent-blue), var(--theme-accent-purple))`,
-                      }}
-                    >
-                      {message.user[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
+                {/* Subtle gradient overlay */}
+                <div 
+                  className="absolute inset-0 opacity-50 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.03), rgba(168, 85, 247, 0.03), transparent)",
+                  }}
+                />
+                
+                <div className="relative flex items-start gap-3">
+                  <div className="relative shrink-0">
+                    {message.profilePicUrl ? (
+                      <img
+                        src={message.profilePicUrl}
+                        alt={message.user}
+                        className="h-12 w-12 rounded-xl object-cover shadow-lg ring-2 ring-white/50"
+                      />
+                    ) : (
                       <div 
-                        className="text-sm font-semibold truncate leading-tight"
+                        className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br text-base font-bold text-white shadow-lg ring-2 ring-white/50"
+                        style={{
+                          background: `linear-gradient(135deg, var(--theme-accent-blue), var(--theme-accent-purple))`,
+                        }}
+                      >
+                        {message.user[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    {/* Online indicator */}
+                    <div 
+                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white"
+                      style={{ backgroundColor: "var(--theme-accent-green)" }}
+                    />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div 
+                        className="text-sm font-bold truncate"
                         style={{ color: "var(--theme-message-text)" }}
                       >
                         {message.user}
                       </div>
                       <div 
-                        className="text-sm font-regular truncate leading-tight"
-                        style={{ color: "var(--theme-message-text)" }}
+                        className="text-xs font-medium shrink-0 opacity-70"
+                        style={{ color: "var(--theme-message-text-secondary)" }}
                       >
                         {new Date(message.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -205,19 +223,21 @@ export default function MessageStream() {
                       </div>
                     </div>
                     <p 
-                      className="mt-1.5 text-sm leading-relaxed line-clamp-3"
+                      className="text-sm leading-relaxed line-clamp-3 font-medium"
                       style={{ color: "var(--theme-message-text-secondary)" }}
                     >
                       {message.message}
                     </p>
                   </div>
                 </div>
-                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                
+                {/* Enhanced hover glow */}
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 rounded-2xl">
                   <div 
-                    className="absolute inset-[-30%] bg-gradient-to-br via-transparent blur-3xl"
+                    className="absolute inset-[-20%] bg-gradient-to-br via-transparent blur-2xl rounded-full"
                     style={{
-                      background: `linear-gradient(to bottom right, var(--theme-accent-blue), transparent, var(--theme-accent-purple))`,
-                      opacity: 0.1,
+                      background: `linear-gradient(135deg, var(--theme-accent-blue), var(--theme-accent-purple))`,
+                      opacity: 0.15,
                     }}
                   />
                 </div>
