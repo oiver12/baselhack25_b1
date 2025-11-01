@@ -1,7 +1,7 @@
 "use client";
 
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import type { Suggestion } from "@/lib/types";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 interface SuggestionCardProps {
   suggestion: Suggestion;

@@ -1,5 +1,5 @@
-import SuggestionsDisplay from "./components/SuggestionsDisplay";
 import MessageStream from "./components/MessageStream";
+import SuggestionsDisplay from "./components/SuggestionsDisplay";
 
 export default function Home() {
   return (

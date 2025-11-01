@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type { Message } from "@/lib/types";
 
 // Mock users and messages for webhook simulation
@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
     // In the future, this will handle Discord webhook messages
     // For now, just acknowledge receipt
     return NextResponse.json({ received: true, data: body });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Invalid request body" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }
@@ -62,9 +62,7 @@ export async function GET(request: NextRequest) {
         type: "connected",
         message: "Webhook stream started",
       });
-      controller.enqueue(
-        encoder.encode(`data: ${initialData}\n\n`)
-      );
+      controller.enqueue(encoder.encode(`data: ${initialData}\n\n`));
 
       // Set up interval to send messages every 5 seconds
       const intervalId = setInterval(() => {

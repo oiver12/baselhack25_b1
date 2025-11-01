@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { Suggestion, SuggestionsResponse } from "@/lib/types";
+import type { SuggestionsResponse } from "@/lib/types";
 
 // Hardcoded stages that build up progressively
 const stages: SuggestionsResponse[] = [

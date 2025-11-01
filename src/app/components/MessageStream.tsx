@@ -10,7 +10,6 @@ interface ToastMessage extends Message {
   groupId?: number; // Group ID for messages that appear at the same time
 }
 
-const MIN_TOAST_DURATION = 6000; // 5 seconds
 const MAX_TOAST_DURATION = 8000; // 8 seconds
 const MAX_VISIBLE_TOASTS = 5;
 const EXIT_ANIMATION_DURATION = 300; // 300ms for fade out
@@ -43,7 +42,7 @@ export default function MessageStream() {
             const lastMessage = prev[prev.length - 1];
             const isSimultaneous =
               lastMessage &&
-              (now - lastMessage.timestamp) < SIMULTANEOUS_THRESHOLD;
+              now - lastMessage.timestamp < SIMULTANEOUS_THRESHOLD;
 
             // Use the same group ID if simultaneous, otherwise get next group ID
             let groupId: number;
@@ -51,8 +50,9 @@ export default function MessageStream() {
               groupId = lastMessage.groupId;
             } else {
               // Get the highest group ID from existing messages and add 1
-              const maxGroupId = prev.reduce((max, msg) =>
-                Math.max(max, msg.groupId ?? -1), -1
+              const maxGroupId = prev.reduce(
+                (max, msg) => Math.max(max, msg.groupId ?? -1),
+                -1,
               );
               groupId = maxGroupId + 1;
             }
@@ -112,71 +112,72 @@ export default function MessageStream() {
     <div className="fixed top-4 right-4 z-50 pointer-events-none">
       <div className="relative">
         {reversedMessages.map((message, index) => {
-        // Index 0 is the newest message (appears at top)
-        const reverseIndex = index;
+          // Index 0 is the newest message (appears at top)
+          const reverseIndex = index;
 
-        // Calculate stack offset - messages stack downward
-        // Newest message has no offset (stays at top)
-        let stackOffset = 0;
-        for (let i = 0; i < index; i++) {
-          const msgAbove = reversedMessages[i];
-          const msgBelow = reversedMessages[i + 1];
-          // Spacing between consecutive messages
-          if (msgAbove.groupId === msgBelow.groupId) {
-            stackOffset += 20;
-          } else {
-            stackOffset += 30;
+          // Calculate stack offset - messages stack downward
+          // Newest message has no offset (stays at top)
+          let stackOffset = 0;
+          for (let i = 0; i < index; i++) {
+            const msgAbove = reversedMessages[i];
+            const msgBelow = reversedMessages[i + 1];
+            // Spacing between consecutive messages
+            if (msgAbove.groupId === msgBelow.groupId) {
+              stackOffset += 20;
+            } else {
+              stackOffset += 30;
+            }
           }
-        }
 
-        const stackScale = 1 - reverseIndex * 0.05;
-        const stackOpacity = 1 - reverseIndex * 0.15;
+          const stackScale = 1 - reverseIndex * 0.05;
+          const stackOpacity = 1 - reverseIndex * 0.15;
 
-        return (
-          <div
-            key={message.id}
-            className={`pointer-events-auto transition-all duration-300 ${message.isExiting ? "fade-out" : "slide-in-from-right fade-in"
+          return (
+            <div
+              key={message.id}
+              className={`pointer-events-auto transition-all duration-300 ${
+                message.isExiting ? "fade-out" : "slide-in-from-right fade-in"
               }`}
-            style={{
-              position: 'absolute',
-              top: `${stackOffset}px`,
-              right: 0,
-              transform: message.isExiting
-                ? undefined
-                : `scale(${stackScale})`,
-              zIndex: 1000 + (reversedMessages.length - reverseIndex),
-              opacity: message.isExiting ? undefined : stackOpacity,
-            }}
-          >
-            <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 w-96">
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
-                  {message.user[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
-                      {message.user}
-                    </div>
-                    <div className="text-sm font-regular text-slate-800 dark:text-slate-100 truncate leading-tight">
-                      {new Date(message.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
+              style={{
+                position: "absolute",
+                top: `${stackOffset}px`,
+                right: 0,
+                transform: message.isExiting
+                  ? undefined
+                  : `scale(${stackScale})`,
+                zIndex: 1000 + (reversedMessages.length - reverseIndex),
+                opacity: message.isExiting ? undefined : stackOpacity,
+              }}
+            >
+              <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 max-w-sm">
+                <div className="flex items-center gap-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
+                    {message.user[0]?.toUpperCase()}
                   </div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-3">
-                    {message.message}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
+                        {message.user}
+                      </div>
+                      <div className="text-sm font-regular text-slate-800 dark:text-slate-100 truncate leading-tight">
+                        {new Date(message.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-3">
+                      {message.message}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
-              </div>
-            </article>
-          </div>
-        );
-      })}
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
+                </div>
+              </article>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
