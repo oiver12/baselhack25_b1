@@ -3,7 +3,7 @@ Question creation endpoint
 """
 
 import discord
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from uuid import uuid4
 from app.api.schemas import QuestionRequest, QuestionResponse, QuestionInfo
@@ -21,7 +21,10 @@ router = APIRouter()
 
 
 @router.post("/questions", response_model=QuestionResponse)
-async def create_question(request: QuestionRequest) -> QuestionResponse:
+async def create_question(
+    request_body: QuestionRequest,
+    http_request: Request
+) -> QuestionResponse:
     """
     Create a new discussion question
 
@@ -29,14 +32,28 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     Body: {"question": "How should we change..."}
     Response: {"question_id": "uuid", "dashboard_url": "..."}
     """
+    # Extract key from query parameters
+    key = http_request.query_params.get("key")
+
+    # Validate API key
+    print(f"DEBUG - URL: {http_request.url}")
+    print(f"DEBUG - All params: {dict(http_request.query_params)}")
+    print(f"DEBUG: Provided key: {key}")
+    print(f"DEBUG: Stored key: {settings.KEY}")
+
+    if not key:
+        raise HTTPException(status_code=401, detail="API key is required")
+
+    if key != settings.KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
     # Generate unique question ID
     question_id = str(uuid4())
     print(question_id)
-    print(request.question)
+    print(request_body.question)
     
     # Create the question state and set as active question (replaces any existing)
-    active_question = create_question_state(question_id, request.question)
-    
+    active_question = create_question_state(question_id, request_body.question)
     # Save to cache
     from app.state import save_all_questions
     save_all_questions()
@@ -47,7 +64,7 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     asyncio.create_task(_analyze_historical_messages(active_question))
     
     # Post to Discord in background (using bot's event loop)
-    _post_to_discord_sync(question_id, request.question)
+    _post_to_discord_sync(question_id, request_body.question)
     
     # Construct dashboard URL
     dashboard_url = f"{settings.DASHBOARD_BASE_URL}/{question_id}"

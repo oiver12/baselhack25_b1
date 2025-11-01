@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     CLUSTER_PERIODIC_INTERVAL: float = 2.0  # Periodic clustering interval in seconds
     # Application Settings
     DASHBOARD_BASE_URL: str = "https://yourapp.com/dashboard"
+    
+    # API Key for authentication
+    KEY: str = "password"
 
 
 settings = Settings()
