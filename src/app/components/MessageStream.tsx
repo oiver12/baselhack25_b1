@@ -23,7 +23,15 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${uuid}`);
+    // Get backend URL from environment variable or use default
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL + `/ws/${uuid}` || `http://127.0.0.1:8000/ws/${uuid}`;
+    
+    // Convert HTTP/HTTPS URL to WebSocket URL
+    const wsUrl = backendUrl
+      .replace(/^http:/, "ws:")
+      .replace(/^https:/, "wss:");
+    
+    const ws = new WebSocket(`${wsUrl}/ws/${uuid}`);
 
     ws.onopen = () => {
       console.log("WebSocket connected");

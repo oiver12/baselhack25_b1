@@ -158,15 +158,15 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
           setSuggestions(data || []);
         } else {
           // Use real backend
-          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/api";
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
           
           // Call messages endpoint first (ignore output, just needs to be called)
-          await fetch(`${backendUrl}/messages`).catch(() => {
+          await fetch(`${backendUrl}/api/messages`).catch(() => {
             // Ignore errors from messages endpoint
           });
           
           // Call Python backend directly - baselhack25_backend/app/api/routes/dashboard.py
-          const response = await fetch(`${backendUrl}/dashboard/${questionId}`);
+          const response = await fetch(`${backendUrl}/api/dashboard/${questionId}`);
           if (!response.ok) {
             if (response.status === 404) {
               console.log("Question not found yet, waiting...");
