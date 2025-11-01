@@ -1,6 +1,7 @@
 """
 In-memory state management for questions and suggestions
 """
+
 from datetime import datetime
 from typing import Dict, List, Optional
 from app.api.schemas import Suggestion, PersonOpinion
@@ -8,6 +9,7 @@ from app.api.schemas import Suggestion, PersonOpinion
 
 class DiscordMessage:
     """Represents a Discord message"""
+
     def __init__(
         self,
         message_id: str,
@@ -29,6 +31,7 @@ class DiscordMessage:
 
 class Participant:
     """Represents a participant in a discussion"""
+
     def __init__(
         self,
         user_id: str,
@@ -46,6 +49,7 @@ class Participant:
 
 class QuestionState:
     """State for a single question/discussion"""
+
     def __init__(
         self,
         question_id: str,
@@ -80,12 +84,12 @@ def create_question_state(question_id: str, question: str) -> QuestionState:
     return state
 
 
-def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
-    """Add a Discord message to a question's state"""
+async def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
+    """Add a Discord message to a question's state and broadcast it"""
     state = questions.get(question_id)
     if state:
         state.discord_messages.append(message)
-        
+
         # Update or create participant
         if message.user_id not in state.participants:
             state.participants[message.user_id] = Participant(
@@ -95,10 +99,19 @@ def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
             )
         state.participants[message.user_id].message_count += 1
 
+        # Broadcast the message to all connected websocket clients
+        from app.api.routes.websocket import broadcast_discord_message
+
+        await broadcast_discord_message(
+            question_id=question_id,
+            username=message.username,
+            message=message.content,
+            profile_pic_url=message.profile_pic_url,
+        )
+
 
 def update_suggestions(question_id: str, suggestions: List[Suggestion]) -> None:
     """Update suggestions for a question"""
     state = questions.get(question_id)
     if state:
         state.suggestions = suggestions
-
