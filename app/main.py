@@ -10,14 +10,23 @@ from app.discord_bot.bot import run_bot
 
 app = FastAPI(title="BaselHack25 Consensus Builder API")
 
-# CORS middleware
+# CORS middleware (more permissive and logs CORS settings for debugging)
+import logging
+
+logger = logging.getLogger("uvicorn")
+
+logger.info(f"Configuring CORS: allow_origins={settings.CORS_ORIGINS}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Optionally expose all headers
+    max_age=600,           # Cache preflight responses for 10 minutes
 )
+
 
 # Include routers
 app.include_router(questions.router, prefix="/api", tags=["questions"])
