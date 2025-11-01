@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, Check, FileText } from "lucide-react";
+import { ArrowLeft, Share2, Check, FileText, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import Link from "next/link";
 
 interface DashboardHeaderProps {
   questionId: string;
@@ -14,6 +13,7 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
   const [questionText, setQuestionText] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isNavigatingToReport, setIsNavigatingToReport] = useState(false);
 
   useEffect(() => {
     async function fetchQuestion() {
@@ -51,6 +51,11 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
     } catch (error) {
       console.error("Failed to copy:", error);
     }
+  };
+
+  const handleReportClick = () => {
+    setIsNavigatingToReport(true);
+    router.push(`/dashboard/${questionId}/report`);
   };
 
   return (
@@ -99,18 +104,28 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
           {/* Actions */}
           <div className="flex items-center gap-2">
             {/* View Report button */}
-            <Link
-              href={`/dashboard/${questionId}/report`}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm"
+            <button
+              onClick={handleReportClick}
+              disabled={isNavigatingToReport}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
                 backgroundColor: "var(--theme-bg-secondary)",
                 color: "var(--theme-fg-primary)",
               }}
               aria-label="View Report"
             >
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Report</span>
-            </Link>
+              {isNavigatingToReport ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="hidden sm:inline">Loading...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Report</span>
+                </>
+              )}
+            </button>
 
             {/* Share button */}
             <button
