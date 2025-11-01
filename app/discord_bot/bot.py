@@ -55,10 +55,12 @@ class ConsensusBot(discord.Client):
 
         # Add to global historical messages if not already present
         try:
-            from app.state import global_historical_messages, global_historical_message_ids
+            from app.state import global_historical_messages, global_historical_message_ids, save_all_discord_messages
             if discord_message.message_id not in global_historical_message_ids:
                 global_historical_messages.append(discord_message)
                 global_historical_message_ids.add(discord_message.message_id)
+                # Save to cache
+                save_all_discord_messages()
         except Exception as e:
             print(f"Warning: Could not save global message: {e}")
 

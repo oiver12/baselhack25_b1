@@ -79,6 +79,9 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
                 # Create new question
                 new_qid = str(uuid.uuid4())
                 create_question_state(new_qid, question_text)
+                # Save to cache
+                from app.state import save_all_questions
+                save_all_questions()
             
             asked_questions_map[question_text] = new_qid
             asked_questions[new_qid] = {
@@ -104,15 +107,12 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
     all_message_texts = [msg.content for msg in messages]
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     
-    # Generate embeddings for all messages
+    # Generate embeddings for all messages (with caching)
     if len(all_message_texts) == 0:
         return list(questions_receiving_messages)
     
-    embedding_response = client.embeddings.create(
-        input=all_message_texts,
-        model="text-embedding-3-small",
-    )
-    embeddings = np.array([item.embedding for item in embedding_response.data])
+    from app.services.embedding_cache import get_embeddings_batch
+    embeddings = await get_embeddings_batch(all_message_texts, use_cache=True)
     
     # Match messages to existing questions first
     matched_to_existing = {}  # message_idx -> (question_id, question_title)
@@ -144,12 +144,9 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
             if not group['sample_messages']:
                 continue
                 
-            # Get embeddings for sample messages from existing question
-            sample_embeddings_response = client.embeddings.create(
-                input=group['sample_messages'],
-                model="text-embedding-3-small",
-            )
-            group_embeddings = np.array([item.embedding for item in sample_embeddings_response.data])
+            # Get embeddings for sample messages from existing question (with caching)
+            from app.services.embedding_cache import get_embeddings_batch
+            group_embeddings = await get_embeddings_batch(group['sample_messages'], use_cache=True)
             
             # Calculate similarity between new messages and this group
             similarities = cosine_similarity(embeddings, group_embeddings)
@@ -172,6 +169,11 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
             msg.question_id = qid  # Set question_id on the message
             qstate.discord_messages.append(msg)
             questions_receiving_messages.add(qid)
+    
+    # Save once after all assignments (if any were made)
+    if matched_to_existing:
+        from app.state import save_all_questions
+        save_all_questions()
     
     # Now cluster only the unmatched messages (if any)
     # Only create new questions if allow_new_questions is True
@@ -210,6 +212,9 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
             # Create new question
             new_qid = str(uuid.uuid4())
             create_question_state(new_qid, question_title)
+            # Save to cache
+            from app.state import save_all_questions
+            save_all_questions()
             
             # Assign message to new question
             qstate = get_question_state(new_qid)
@@ -315,20 +320,15 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
                 # Check if the new question title is similar to any existing question
                 matched_to_existing_q = False
                 if existing_groups:
-                    # Get embeddings for the new question title and compare to existing
-                    title_embedding_response = client.embeddings.create(
-                        input=[question_title],
-                        model="text-embedding-3-small",
-                    )
-                    title_embedding = np.array([title_embedding_response.data[0].embedding])
+                    # Get embeddings for the new question title and compare to existing (with caching)
+                    from app.services.embedding_cache import get_embedding
+                    title_embedding = await get_embedding(question_title)
+                    title_embedding = title_embedding.reshape(1, -1)  # Reshape for similarity calculation
                     
                     for group in existing_groups:
-                        # Get embedding for existing question title
-                        existing_title_embedding_response = client.embeddings.create(
-                            input=[group['title']],
-                            model="text-embedding-3-small",
-                        )
-                        existing_title_embedding = np.array([existing_title_embedding_response.data[0].embedding])
+                        # Get embedding for existing question title (with caching)
+                        existing_title_embedding = await get_embedding(group['title'])
+                        existing_title_embedding = existing_title_embedding.reshape(1, -1)
                         
                         # Check similarity
                         similarity = cosine_similarity(title_embedding, existing_title_embedding)[0][0]
@@ -347,6 +347,9 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
                         new_qid = str(uuid.uuid4())
                         create_question_state(new_qid, question_title)
                         qid = new_qid
+                        # Save to cache
+                        from app.state import save_all_questions
+                        save_all_questions()
                 elif matched_to_existing_q:
                     pass  # qid already set above
                 else:
@@ -364,5 +367,10 @@ async def assign_messages_to_existing_questions(messages: [DiscordMessage], allo
                         msg.question_id = qid  # Set question_id on the message
                         qstate.discord_messages.append(msg)
                         questions_receiving_messages.add(qid)
+                
+                # Save once after all messages in this cluster are assigned
+                if cluster_indices:
+                    from app.state import save_all_questions
+                    save_all_questions()
     
     return list(questions_receiving_messages)

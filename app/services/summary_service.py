@@ -42,19 +42,13 @@ async def generate_two_word_summary(
     if len(messages) == 1:
         # Single message, check if it fits existing groups first
         if existing_groups:
-            single_msg_embedding = client.embeddings.create(
-                input=[messages[0]],
-                model="text-embedding-3-small",
-            )
-            single_emb = np.array([single_msg_embedding.data[0].embedding])
+            from app.services.embedding_cache import get_embedding, get_embeddings_batch
+            single_emb = await get_embedding(messages[0])
+            single_emb = single_emb.reshape(1, -1)  # Reshape for similarity calculation
             
             for group in existing_groups:
                 if group['sample_messages']:
-                    group_embeddings = client.embeddings.create(
-                        input=group['sample_messages'][:3],  # Use first 3 as samples
-                        model="text-embedding-3-small",
-                    )
-                    group_embs = np.array([item.embedding for item in group_embeddings.data])
+                    group_embs = await get_embeddings_batch(group['sample_messages'][:3], use_cache=True)  # Use first 3 as samples
                     similarities = cosine_similarity(single_emb, group_embs)
                     max_similarity = np.max(similarities)
                     
@@ -75,13 +69,9 @@ async def generate_two_word_summary(
         words = summary.split()[:2]
         return [" ".join(words)]
     
-    # Generate embeddings for all messages
-    embedding_response = client.embeddings.create(
-        input=messages,
-        model="text-embedding-3-small",
-    )
-    
-    embeddings = np.array([item.embedding for item in embedding_response.data])
+    # Generate embeddings for all messages (with caching)
+    from app.services.embedding_cache import get_embeddings_batch
+    embeddings = await get_embeddings_batch(messages, use_cache=True)
     
     # Match messages to existing groups first
     matched_to_existing = {}  # message_idx -> group_title
@@ -93,12 +83,9 @@ async def generate_two_word_summary(
             if not group['sample_messages']:
                 continue
                 
-            # Get embeddings for sample messages from existing group
-            sample_embeddings_response = client.embeddings.create(
-                input=group['sample_messages'][:5],  # Use first 5 as representative samples
-                model="text-embedding-3-small",
-            )
-            group_embeddings = np.array([item.embedding for item in sample_embeddings_response.data])
+            # Get embeddings for sample messages from existing group (with caching)
+            from app.services.embedding_cache import get_embeddings_batch
+            group_embeddings = await get_embeddings_batch(group['sample_messages'][:5], use_cache=True)  # Use first 5 as representative samples
             
             # Calculate similarity between new messages and this group
             similarities = cosine_similarity(embeddings, group_embeddings)
@@ -278,10 +265,12 @@ async def classify_message(message: [str], question_id: Optional[str] = None) ->
                 question_state = get_question_state(question_id)
                 if question_state:
                     question_state.message_classifications[msg] = label
-                    # Auto-save cache to file
-                    from app.state import _auto_save_cache
-                    _auto_save_cache(question_id)
             cached_classifications[msg] = label
+    
+    # Save once after all classifications (if any were made)
+    if cached_classifications:
+        from app.state import save_all_questions
+        save_all_questions()
     
     # Build results array in original order
     results = []
@@ -357,8 +346,8 @@ async def find_excellent_message(messages: [str], class_labels: [str], question_
         if question_state:
             question_state.excellent_message = excellent_msg
             # Auto-save cache to file
-            from app.state import _auto_save_cache
-            _auto_save_cache(question_id)
+            from app.state import save_all_questions
+            save_all_questions()
     
     return excellent_msg
     
@@ -449,8 +438,8 @@ async def process_messages_for_question(question_id: str) -> None:
     question_state.two_word_summaries = sorted(set(message_summaries))
     
     # Save cache
-    from app.state import _auto_save_cache
-    _auto_save_cache(question_id)
+    from app.state import save_all_questions
+    save_all_questions()
 
 
 async def process_single_message_for_question(question_id: str, message: DiscordMessage) -> None:
@@ -540,8 +529,8 @@ async def process_single_message_for_question(question_id: str, message: Discord
         msg.is_excellent = (excellent_message == msg.content) if excellent_message else False
     
     # Save cache
-    from app.state import _auto_save_cache
-    _auto_save_cache(question_id)
+    from app.state import save_all_questions
+    save_all_questions()
 
 
 async def summarize_followup_messages(user_id: str, question_id: str) -> Optional[str]:
