@@ -14,7 +14,7 @@ const MAX_TOAST_DURATION = 8000; // 8 seconds
 const MAX_VISIBLE_TOASTS = 5;
 const EXIT_ANIMATION_DURATION = 300; // 300ms for fade out
 const SIMULTANEOUS_THRESHOLD = 500; // Messages within 500ms are considered simultaneous
-const MESSAGE_DELAY = 300; // Delay in ms before displaying messages, even when pending/connecting
+const MESSAGE_DELAY = 0; // Delay in ms before displaying messages, even when pending/connecting
 
 interface MessageStreamProps {
   uuid: string;
