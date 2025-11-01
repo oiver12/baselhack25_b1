@@ -2,11 +2,13 @@
 FastAPI application entry point
 """
 import threading
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import questions, dashboard, websocket, messages, report
 from app.config import settings
 from app.discord_bot.bot import run_bot
+from app.services.pipeline import periodic_clustering
 
 app = FastAPI(title="BaselHack25 Consensus Builder API")
 
@@ -156,4 +158,8 @@ async def startup_event():
         asyncio.create_task(fetch_history_background())
     else:
         print("Warning: DISCORD_BOT_TOKEN not set, skipping Discord bot startup")
+    
+    # Start periodic clustering background task (runs every 1 second)
+    asyncio.create_task(periodic_clustering())
+    print("Started periodic clustering task (1s interval)")
 

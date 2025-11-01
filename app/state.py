@@ -7,6 +7,7 @@ import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from pathlib import Path
+from uuid import uuid4
 
 
 class DiscordMessage:
@@ -84,6 +85,32 @@ class Participant:
         self.dm_sent = dm_sent
 
 
+class Cluster:
+    """Represents a message cluster with centroid and metrics"""
+    
+    def __init__(
+        self,
+        cluster_id: str,
+        label: str,
+        centroid: List[float],
+        message_ids: List[str],
+        frozen: bool = False,
+        intra_sim: float = 0.0,
+        sentiment_avg: float = 0.0,
+        sentiment_std: float = 0.0,
+        created_at: Optional[datetime] = None,
+    ):
+        self.cluster_id = cluster_id
+        self.label = label
+        self.centroid = centroid  # List[float] for serialization
+        self.message_ids = message_ids
+        self.frozen = frozen
+        self.intra_sim = intra_sim
+        self.sentiment_avg = sentiment_avg
+        self.sentiment_std = sentiment_std
+        self.created_at = created_at or datetime.utcnow()
+
+
 class QuestionState:
     """State for a single question/discussion"""
 
@@ -104,6 +131,10 @@ class QuestionState:
         self.excellent_message: Optional[str] = None
         # List of unique 2-word summaries for this question
         self.two_word_summaries: List[str] = []
+        # Clusters with centroids and metrics
+        self.clusters: List[Cluster] = []
+        # Unassigned message IDs awaiting cluster assignment
+        self.unassigned_buffer: List[str] = []
 
 
 # Global in-memory storage
@@ -225,6 +256,21 @@ def save_all_questions() -> None:
                 "two_word_summaries": active_question.two_word_summaries,
                 "message_classifications": active_question.message_classifications,
                 "excellent_message": active_question.excellent_message,
+                "clusters": [
+                    {
+                        "cluster_id": c.cluster_id,
+                        "label": c.label,
+                        "centroid": c.centroid,  # Already List[float]
+                        "message_ids": c.message_ids,
+                        "frozen": c.frozen,
+                        "intra_sim": c.intra_sim,
+                        "sentiment_avg": c.sentiment_avg,
+                        "sentiment_std": c.sentiment_std,
+                        "created_at": c.created_at.isoformat() if hasattr(c.created_at, 'isoformat') else str(c.created_at),
+                    }
+                    for c in active_question.clusters
+                ],
+                "unassigned_buffer": active_question.unassigned_buffer,
             }
             cache_data = {"active_question": question_data}
         else:
@@ -290,6 +336,25 @@ def load_all_questions() -> None:
                 state.message_classifications = question_data.get("message_classifications", {})
                 state.excellent_message = question_data.get("excellent_message")
                 
+                # Restore clusters
+                clusters_data = question_data.get("clusters", [])
+                for c_data in clusters_data:
+                    cluster = Cluster(
+                        cluster_id=c_data["cluster_id"],
+                        label=c_data["label"],
+                        centroid=c_data["centroid"],  # Already List[float]
+                        message_ids=c_data["message_ids"],
+                        frozen=c_data.get("frozen", False),
+                        intra_sim=c_data.get("intra_sim", 0.0),
+                        sentiment_avg=c_data.get("sentiment_avg", 0.0),
+                        sentiment_std=c_data.get("sentiment_std", 0.0),
+                        created_at=datetime.fromisoformat(c_data["created_at"]) if c_data.get("created_at") else None,
+                    )
+                    state.clusters.append(cluster)
+                
+                # Restore unassigned buffer
+                state.unassigned_buffer = question_data.get("unassigned_buffer", [])
+                
                 active_question = state
                 print(f"✓ Loaded active question from cache")
                 return
@@ -352,6 +417,10 @@ def load_all_questions() -> None:
                     state.two_word_summaries = data.get("two_word_summaries", [])
                     state.message_classifications = data.get("message_classifications", {})
                     state.excellent_message = data.get("excellent_message")
+                    
+                    # Initialize empty clusters and buffer (will be bootstrapped later)
+                    state.clusters = []
+                    state.unassigned_buffer = []
                     
                     active_question = state
                     # Save in new format
