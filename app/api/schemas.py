@@ -10,7 +10,7 @@ class PersonOpinion(BaseModel):
     name: str
     profile_pic_url: str
     message: str  # If followup questions were asked, this is the summary / all the messages
-    classification: Literal["sophisticated", "simple", "neutral"]
+    classification: Literal["good", "neutral", "bad"]
 
 
 class Suggestion(BaseModel):

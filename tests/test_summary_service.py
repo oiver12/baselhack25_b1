@@ -29,10 +29,10 @@ def load_dummy_messages():
 
 # Inline dummy data as fallback
 DUMMY_MESSAGES = [
-    "I think we should increase the budget for marketing",
+    "I think the email service is working very well",
     "Marketing needs more funding to succeed",
     "Let's allocate more money to marketing campaigns",
-    "The team needs better communication tools",
+    "The team already as very good communication tools",
     "We should improve how teams communicate",
     "Communication between departments is lacking",
     "Maybe we could use Slack or Discord",
@@ -42,14 +42,16 @@ DUMMY_MESSAGES = [
     "Our workflow would benefit from instant messaging",
     "I propose we adopt a new project management tool",
     "We should implement better project tracking software",
-    "Let's use Jira or Asana for task management"
+    "Let's use Jira or Asana for task management",
+    "lionles cock is too small"
+
 ]
 
 
 async def test_generate_two_word_summary():
     """Test the clustering function with dummy data"""
-    # Try to load from file, otherwise use inline data
-    messages = load_dummy_messages() or DUMMY_MESSAGES
+    # Use inline data first (updated), fallback to JSON file
+    messages = DUMMY_MESSAGES or load_dummy_messages()
     
     print(f"Testing with {len(messages)} messages:")
     print("-" * 60)
