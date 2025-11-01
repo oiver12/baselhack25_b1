@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { Message } from "@/lib/types";
 
 // Mock users and messages for webhook simulation

@@ -8,8 +8,6 @@ import type {
   SuggestionOpinion,
   SuggestionsResponse,
 } from "@/lib/types";
-import { Star, TrendingDown, ThumbsUp, ThumbsDown } from "lucide-react";
-import Image from "next/image";
 import * as d3 from "d3-force";
 
 interface BubblePosition {
