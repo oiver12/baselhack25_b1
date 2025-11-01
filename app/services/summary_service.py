@@ -566,3 +566,59 @@ async def summarize_followup_messages(user_id: str, question_id: Optional[str] =
     # TODO: Generate summary of multiple messages
     return "Summarized messages from user"
 
+
+async def generate_bullet_point_summary_with_pros_cons(messages: List[str]) -> str:
+    """
+    Generate 3 bullet points summary of a list of messages.
+    Generate in total 2 pros and 2 cons for each bullet point
+    """
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    prompt = (
+        "Summarize the following messages as 3 concise bullet points. "
+        "Also add a approval rating for each bullet point from 0 to 1"
+        "Each bullet point should be clear and distinct."
+        "Respond with the 3 bullet points, no introduction or extra text. Also respond with 2 pros and 2 cons for each bullet point. "
+        "Respond in this exact JSON format (no extra commentary): {\n"
+        "  \"summary\": \"Summary of all the messages (approx 40 words)\",\n"
+        "  \"points\": [\n"
+        "    {\n"
+        "      \"title\": \"First bullet point\",\n"
+        "      \"pros\": [\"Pro 1\", \"Pro 2\"],\n"
+        "      \"cons\": [\"Con 1\", \"Con 2\"]\n"
+        "      \"approval_rating\": 0.5\n"
+        "    },\n"
+        "    {\n"
+        "      \"title\": \"Second bullet point\",\n"
+        "      \"pros\": [\"Pro 1\", \"Pro 2\"],\n"
+        "      \"cons\": [\"Con 1\", \"Con 2\"]\n"
+        "      \"approval_rating\": 0.5\n"
+        "    },\n"
+        "    {\n"
+        "      \"title\": \"Third bullet point\",\n"
+        "      \"pros\": [\"Pro 1\", \"Pro 2\"],\n"
+        "      \"cons\": [\"Con 1\", \"Con 2\"]\n"
+        "      \"approval_rating\": 0.5\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        f"The question to this conversation is: What is the risk of using ai in business?"
+    )
+    for msg in messages:
+        prompt += f"- {msg}\n"
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a skilled summarizer. Summarize in exactly 3 bullet points, one per line, with no introduction or extra commentary. The bullet points should be how we can solve the problem",
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        max_tokens=2000,
+        temperature=0.4,
+    )
+    summary = response.choices[0].message.content.strip()
+    return summary
