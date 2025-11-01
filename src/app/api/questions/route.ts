@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
 
     // Call Python backend API - matches baselhack25_backend/app/api/routes/questions.py
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const backendEndpoint = `${backendUrl}/api/questions`;
     
     console.log(`Calling Python backend at ${backendEndpoint} with question:`, question.trim());

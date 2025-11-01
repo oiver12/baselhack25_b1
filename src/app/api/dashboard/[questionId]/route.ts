@@ -15,7 +15,7 @@ export async function GET(
     }
 
     // Call Python backend API - matches baselhack25_backend/app/api/routes/dashboard.py
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const backendEndpoint = `${backendUrl}/api/dashboard/${questionId}`;
     
     console.log(`Calling Python backend dashboard at ${backendEndpoint}`);
