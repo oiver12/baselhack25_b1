@@ -16,7 +16,10 @@ RUN apk add --no-cache \
     cairo \
     pango \
     gdk-pixbuf \
-    && rm -rf /var/cache/apk/*
+    fontconfig \
+    ttf-dejavu \
+    && rm -rf /var/cache/apk/* \
+    && fc-cache -f
 
 
 COPY requirements.txt .
