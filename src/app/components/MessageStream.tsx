@@ -61,6 +61,7 @@ export default function MessageStream() {
               id: messageId,
               user: data.user,
               message: data.message,
+              profilePicUrl: data.profilePicUrl,
               timestamp: now,
               isExiting: false,
               groupId,
@@ -151,9 +152,17 @@ export default function MessageStream() {
             >
               <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 w-sm">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
-                    {message.user[0]?.toUpperCase()}
-                  </div>
+                  {message.profilePicUrl ? (
+                    <img
+                      src={message.profilePicUrl}
+                      alt={message.user}
+                      className="h-10 w-10 shrink-0 rounded-full object-cover shadow-md"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
+                      {message.user[0]?.toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
