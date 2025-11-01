@@ -1,0 +1,43 @@
+{
+  "messages": [
+    "I think we should increase the budget for marketing",
+    "Marketing needs more funding to succeed",
+    "Let's allocate more money to marketing campaigns",
+    "The team needs better communication tools",
+    "We should improve how teams communicate",
+    "Communication between departments is lacking",
+    "Maybe we could use Slack or Discord",
+    "We need a better chat platform for collaboration",
+    "The current email system is too slow",
+    "Email communication is outdated and inefficient",
+    "Our workflow would benefit from instant messaging",
+    "I propose we adopt a new project management tool",
+    "We should implement better project tracking software",
+    "Let's use Jira or Asana for task management"
+  ],
+  "scenarios": {
+    "marketing_budget": [
+      "I think we should increase the budget for marketing",
+      "Marketing needs more funding to succeed",
+      "Let's allocate more money to marketing campaigns"
+    ],
+    "communication_tools": [
+      "The team needs better communication tools",
+      "We should improve how teams communicate",
+      "Communication between departments is lacking",
+      "Maybe we could use Slack or Discord",
+      "We need a better chat platform for collaboration"
+    ],
+    "email_complaints": [
+      "The current email system is too slow",
+      "Email communication is outdated and inefficient",
+      "Our workflow would benefit from instant messaging"
+    ],
+    "project_management": [
+      "I propose we adopt a new project management tool",
+      "We should implement better project tracking software",
+      "Let's use Jira or Asana for task management"
+    ]
+  }
+}
+
