@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Clustering Configuration
     CLUSTER_MAX_COUNT: int = 4  # Maximum number of active clusters
     CLUSTER_ASSIGNMENT_THRESHOLD: float = 0.73  # Nearest-centroid assignment threshold
-    CLUSTER_PERIODIC_INTERVAL: float = 1.0  # Periodic clustering interval in seconds
+    CLUSTER_PERIODIC_INTERVAL: float = 2.0  # Periodic clustering interval in seconds
     # Application Settings
     DASHBOARD_BASE_URL: str = "https://yourapp.com/dashboard"
 

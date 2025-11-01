@@ -1,10 +1,12 @@
 import numpy as np
+import re
 from uuid import uuid4
 from app.services import clustering, llm_service
 from app.state import get_active_question, save_all_questions, Cluster
 from app.services.embedding_cache import get_embeddings_batch, get_embedding
 from app.config import settings
 from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 async def assign_message(message):
@@ -96,10 +98,88 @@ async def bootstrap_fixed_kmeans():
         if matching_existing and best_overlap_ratio > 0.5:
             label = matching_existing.label
         else:
-            # Generate new label (use up to 5 messages)
-            # Pass existing labels from this batch to ensure distinctness
-            label_texts = [m.content for m in cluster_messages[:5]]
-            label = await llm_service.two_word_label(label_texts, existing_labels=generated_labels)
+            # Generate new label (use messages closest to centroid)
+            centroid_2d = centroid.reshape(1, -1)
+            similarities = cosine_similarity(cluster_embs, centroid_2d).flatten()
+            
+            # Get indices of top 5 messages closest to centroid (or all if less than 5)
+            top_indices = np.argsort(similarities)[::-1][:min(5, len(cluster_messages))]
+            
+            # Select the messages closest to centroid
+            label_texts = [cluster_messages[i].content for i in top_indices]
+            
+            # Generate label with retry logic
+            max_attempts = 3
+            label = None
+            
+            for attempt in range(max_attempts):
+                is_retry = attempt > 0
+                is_hard_retry = attempt >= 2
+                
+                # Generate label
+                candidate_label = await llm_service.two_word_label(
+                    label_texts, 
+                    existing_labels=generated_labels,
+                    is_retry=is_retry,
+                    is_hard_retry=is_hard_retry
+                )
+                
+                # Check exact duplicate (case-insensitive)
+                label_lower = candidate_label.lower()
+                existing_lower = [l.lower() for l in generated_labels]
+                
+                if label_lower not in existing_lower:
+                    # Check embedding similarity if existing labels exist
+                    if generated_labels and len(generated_labels) > 0:
+                        # Get embeddings for candidate and existing labels
+                        all_labels = generated_labels + [candidate_label]
+                        label_embs = await get_embeddings_batch(all_labels, use_cache=True)
+                        
+                        # Check similarity with all existing labels
+                        candidate_emb = label_embs[-1:].reshape(1, -1)
+                        existing_label_embs = label_embs[:-1]
+                        
+                        similarities = cosine_similarity(candidate_emb, existing_label_embs)[0]
+                        max_similarity = float(np.max(similarities)) if len(similarities) > 0 else 0.0
+                        
+                        # If too similar (>0.90), retry with harder prompt
+                        if max_similarity > 0.90:
+                            if attempt < max_attempts - 1:
+                                continue  # Retry
+                            else:
+                                # Final attempt failed - append distinguishing word
+                                words = re.findall(r'\b\w+\b', ' '.join(label_texts))
+                                stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+                                meaningful_words = [w.lower() for w in words if w.lower() not in stopwords and len(w) > 3]
+                                if meaningful_words:
+                                    distinguisher = meaningful_words[0].capitalize()
+                                    candidate_label = f"{candidate_label} {distinguisher}"
+                                else:
+                                    first_word = label_texts[0].split()[0] if label_texts else "new"
+                                    candidate_label = f"{candidate_label} {first_word.capitalize()}"
+                    else:
+                        # No existing labels, accept the label
+                        pass
+                    
+                    label = candidate_label
+                    break  # Success
+                else:
+                    # Exact duplicate - will retry on next iteration
+                    if attempt == max_attempts - 1:
+                        # Final attempt - append distinguisher
+                        words = re.findall(r'\b\w+\b', ' '.join(label_texts))
+                        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+                        meaningful_words = [w.lower() for w in words if w.lower() not in stopwords and len(w) > 3]
+                        if meaningful_words:
+                            distinguisher = meaningful_words[0].capitalize()
+                            label = f"{candidate_label} {distinguisher}"
+                        else:
+                            first_word = label_texts[0].split()[0] if label_texts else "new"
+                            label = f"{candidate_label} {first_word.capitalize()}"
+            
+            if not label:
+                # Fallback if all attempts somehow failed
+                label = "summary message"
         
         # Track this label for subsequent clusters (both reused and newly generated)
         generated_labels.append(label)

@@ -25,6 +25,10 @@ async def get_dashboard_data(question_id: str):
     if question_state.question_id != question_id:
         raise HTTPException(status_code=404, detail="Question not found")
     
+    # Return empty list if there are fewer than 5 relevant messages
+    if len(question_state.discord_messages) < 5:
+        return []
+    
     # Return question state
     # Format: Suggestions[]
     # Example object for reference:

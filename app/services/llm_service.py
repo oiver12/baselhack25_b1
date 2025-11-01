@@ -8,19 +8,32 @@ from app.config import settings
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
-async def two_word_label(texts: list[str], existing_labels: list[str] | None = None) -> str:
+async def two_word_label(
+    texts: list[str], 
+    existing_labels: list[str] | None = None,
+    is_retry: bool = False,
+    is_hard_retry: bool = False
+) -> str:
     text = "\n".join(texts[:5])
     if len(texts) > 5:
         text += f"\n... and {len(texts)-5} more"
     
-    system_prompt = "Summarize in exactly 2 words, no punctuation."
-    user_prompt = text
-    
-    # Add existing labels context if provided
-    if existing_labels:
-        system_prompt = "Summarize in exactly 2 words, no punctuation. Make sure your label is distinct from existing labels."
+    # Build prompts based on retry level
+    if is_hard_retry:
+        system_prompt = "CRITICAL: You MUST generate a completely different 2-word label. Use DIFFERENT WORDS entirely, NOT numbered variants (e.g., not 'AI' and 'AI 2'). The label must be semantically distinct with different concepts."
+        existing_labels_str = ", ".join(existing_labels) if existing_labels else ""
+        user_prompt = f"URGENT: The previous attempt generated a label too similar to existing ones. Generate a COMPLETELY DIFFERENT 2-word label.\n\nEXISTING LABELS TO AVOID: {existing_labels_str}\n\nYour label must use different words and concepts entirely. Examples of BAD pairs: ('Room selection', 'Room selection 2') or ('AI', 'AI system'). Examples of GOOD pairs: ('Room selection', 'Workspace setup') or ('AI', 'Machine learning').\n\nMessages to summarize:\n{text}"
+    elif is_retry:
+        system_prompt = "Generate a 2-word label that is COMPLETELY DIFFERENT from existing labels. Use different words, NOT numbered variants or slight variations."
+        existing_labels_str = ", ".join(existing_labels) if existing_labels else ""
+        user_prompt = f"Generate a 2-word label. Your previous attempt was too similar to existing labels.\n\nEXISTING LABELS: {existing_labels_str}\n\nCRITICAL: Your label must use DIFFERENT WORDS entirely, not numbered variants. Make it semantically distinct.\n\nMessages to summarize:\n{text}"
+    elif existing_labels:
+        system_prompt = "Summarize in exactly 2 words, no punctuation. Make sure your label is distinct from existing labels - use different words, not numbered variants."
         existing_labels_str = ", ".join(existing_labels)
-        user_prompt = f"Generate a 2-word label. Existing labels: {existing_labels_str}. Make sure your label is distinct.\n\nMessages to summarize:\n{text}"
+        user_prompt = f"Generate a 2-word label. Existing labels: {existing_labels_str}. Make sure your label is distinct - use different words entirely, NOT numbered variants.\n\nMessages to summarize:\n{text}"
+    else:
+        system_prompt = "Summarize in exactly 2 words, no punctuation."
+        user_prompt = text
     
     res = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -29,7 +42,7 @@ async def two_word_label(texts: list[str], existing_labels: list[str] | None = N
             {"role": "user", "content": user_prompt},
         ],
         max_tokens=10,
-        temperature=0.3,
+        temperature=0.5 if is_hard_retry else 0.3,
     )
     words = (res.choices[0].message.content or "").strip().split()[:2]
     return " ".join(words) if words else "summary message"
@@ -120,5 +133,6 @@ async def generate_bullet_point_summary_with_pros_cons(messages: List[str]) -> s
         max_tokens=2000,
         temperature=0.4,
     )
-    summary = response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    summary = content.strip() if content else ""
     return summary
