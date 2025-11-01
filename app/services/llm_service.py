@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from openai import OpenAI
 from typing import List
 from app.config import settings
