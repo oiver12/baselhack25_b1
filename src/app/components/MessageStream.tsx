@@ -33,98 +33,146 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
     
     // Construct WebSocket URL: ws://localhost:8000/ws/{uuid}
     // Backend route is registered with prefix "/ws" and endpoint "/{question_id}"
-    const ws = new WebSocket(`${wsBaseUrl}/ws/${uuid}`);
+    const wsUrl = `${wsBaseUrl}/ws/${uuid}`;
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isManualClose = false;
+    const maxReconnectDelay = 30000; // 30 seconds max delay
+    let reconnectAttempts = 0;
 
-    ws.onopen = () => {
-      console.log("WebSocket connected successfully");
-    };
+    const connect = () => {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return; // Already connecting or connected
+      }
 
-    ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        ws = new WebSocket(wsUrl);
+        console.log(`Connecting to WebSocket: ${wsUrl}`);
 
-        if (data.type === "connected") {
-          return;
-        }
+        ws.onopen = () => {
+          console.log("WebSocket connected successfully");
+          reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+        };
 
-        if (data.type === "message") {
-          const now = Date.now();
-          const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
 
-          setMessages((prev) => {
-            // Check if this message arrives at the same time as the last one
-            const lastMessage = prev[prev.length - 1];
-            const isSimultaneous =
-              lastMessage &&
-              now - lastMessage.timestamp < SIMULTANEOUS_THRESHOLD;
-
-            // Use the same group ID if simultaneous, otherwise get next group ID
-            let groupId: number;
-            if (isSimultaneous && lastMessage.groupId !== undefined) {
-              groupId = lastMessage.groupId;
-            } else {
-              // Get the highest group ID from existing messages and add 1
-              const maxGroupId = prev.reduce(
-                (max, msg) => Math.max(max, msg.groupId ?? -1),
-                -1,
-              );
-              groupId = maxGroupId + 1;
+            if (data.type === "connected") {
+              console.log("WebSocket connection confirmed:", data.message);
+              return;
             }
 
-            const newMessage: ToastMessage = {
-              id: messageId,
-              user: data.user,
-              message: data.message,
-              profilePicUrl: data.profilePicUrl,
-              timestamp: now,
-              isExiting: false,
-              groupId,
-            };
+            if (data.type === "initial") {
+              console.log(`Initial state: ${data.message_count} messages`);
+              return;
+            }
 
-            // Add new message at the end (will appear at top of stack)
-            const updated = [...prev, newMessage];
-            // Keep only the most recent messages
-            return updated.slice(-MAX_VISIBLE_TOASTS);
-          });
+            if (data.type === "message") {
+              const now = Date.now();
+              const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
 
-          // Auto-dismiss after duration
-          setTimeout(() => {
-            setMessages((prev) => {
-              // Mark as exiting first
-              return prev.map((msg) =>
-                msg.id === messageId ? { ...msg, isExiting: true } : msg,
-              );
-            });
+              setMessages((prev) => {
+                // Check if this message arrives at the same time as the last one
+                const lastMessage = prev[prev.length - 1];
+                const isSimultaneous =
+                  lastMessage &&
+                  now - lastMessage.timestamp < SIMULTANEOUS_THRESHOLD;
 
-            // Remove after exit animation
-            setTimeout(() => {
-              setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-            }, EXIT_ANIMATION_DURATION);
-          }, MAX_TOAST_DURATION);
-        }
-      } catch (err) {
-        console.error("Error parsing WebSocket message:", err);
+                // Use the same group ID if simultaneous, otherwise get next group ID
+                let groupId: number;
+                if (isSimultaneous && lastMessage.groupId !== undefined) {
+                  groupId = lastMessage.groupId;
+                } else {
+                  // Get the highest group ID from existing messages and add 1
+                  const maxGroupId = prev.reduce(
+                    (max, msg) => Math.max(max, msg.groupId ?? -1),
+                    -1,
+                  );
+                  groupId = maxGroupId + 1;
+                }
+
+                const newMessage: ToastMessage = {
+                  id: messageId,
+                  user: data.user,
+                  message: data.message,
+                  profilePicUrl: data.profilePicUrl,
+                  timestamp: now,
+                  isExiting: false,
+                  groupId,
+                };
+
+                // Add new message at the end (will appear at top of stack)
+                const updated = [...prev, newMessage];
+                // Keep only the most recent messages
+                return updated.slice(-MAX_VISIBLE_TOASTS);
+              });
+
+              // Auto-dismiss after duration
+              setTimeout(() => {
+                setMessages((prev) => {
+                  // Mark as exiting first
+                  return prev.map((msg) =>
+                    msg.id === messageId ? { ...msg, isExiting: true } : msg,
+                  );
+                });
+
+                // Remove after exit animation
+                setTimeout(() => {
+                  setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+                }, EXIT_ANIMATION_DURATION);
+              }, MAX_TOAST_DURATION);
+            }
+          } catch (err) {
+            console.error("Error parsing WebSocket message:", err);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          console.error("WebSocket URL was:", wsUrl);
+        };
+
+        ws.onclose = (event) => {
+          console.log("WebSocket closed:", event.code, event.reason);
+          
+          if (isManualClose) {
+            return; // Don't reconnect if manually closed
+          }
+
+          if (event.code !== 1000) {
+            console.warn(`WebSocket closed unexpectedly with code ${event.code}: ${event.reason || "No reason provided"}`);
+            
+            // Attempt to reconnect with exponential backoff
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay);
+            console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts})...`);
+            
+            reconnectTimeout = setTimeout(() => {
+              connect();
+            }, delay);
+          }
+        };
+      } catch (error) {
+        console.error("Failed to create WebSocket connection:", error);
       }
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      console.error("WebSocket URL was:", `${wsBaseUrl}/ws/${uuid}`);
-    };
-
-    ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
-      if (event.code !== 1000) {
-        console.warn(`WebSocket closed unexpectedly with code ${event.code}: ${event.reason || "No reason provided"}`);
-      }
-    };
+    // Initial connection
+    connect();
 
     return () => {
-      if (
-        ws.readyState === WebSocket.OPEN ||
-        ws.readyState === WebSocket.CONNECTING
-      ) {
-        ws.close();
+      isManualClose = true;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        if (
+          ws.readyState === WebSocket.OPEN ||
+          ws.readyState === WebSocket.CONNECTING
+        ) {
+          ws.close();
+        }
       }
     };
   }, [uuid]);

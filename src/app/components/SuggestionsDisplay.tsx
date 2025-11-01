@@ -14,7 +14,7 @@ import * as d3Select from "d3-selection";
 import AnalyticsDashboard from "./AnalyticsDashboard";
 
 // Toggle between mock and real backend
-const USE_MOCK_BACKEND = true;
+const USE_MOCK_BACKEND = false;
 
 interface BubblePosition {
   x: number;
