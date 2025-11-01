@@ -81,8 +81,10 @@ async def get_whole_Report(question_state: QuestionState) -> Dict[str, Any]:
     """
     Get the whole report for a question
     """
-    results = await make_2d_plot(question_state)
-    summary = await generate_bullet_point_summary_with_pros_cons([msg.content for msg in question_state.discord_messages])
+    import asyncio
+    results_task = asyncio.create_task(make_2d_plot(question_state))
+    summary_task = asyncio.create_task(generate_bullet_point_summary_with_pros_cons([msg.content for msg in question_state.discord_messages]))
+    results, summary = await asyncio.gather(results_task, summary_task)
     
     # Try to parse JSON, otherwise keep as string
     try:
