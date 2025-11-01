@@ -21,32 +21,53 @@ async def get_dashboard_data(question_id: str):
         raise HTTPException(status_code=404, detail="Question not found")
     
     # Return question state
-    return {
-        "question_id": question_state.question_id,
-        "question": question_state.question,
-        "created_at": question_state.created_at.isoformat() if hasattr(question_state.created_at, 'isoformat') else str(question_state.created_at),
-        "messages": [
-            {
-                "message_id": msg.message_id,
-                "user_id": msg.user_id,
-                "username": msg.username,
-                "profile_pic_url": msg.profile_pic_url,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat() if hasattr(msg.timestamp, 'isoformat') else str(msg.timestamp),
-                "channel_id": msg.channel_id,
-                "question_id": msg.question_id,
-            }
-            for msg in question_state.discord_messages
-        ],
-        "participants": [
-            {
-                "user_id": p.user_id,
-                "username": p.username,
-                "profile_pic_url": p.profile_pic_url,
-                "message_count": p.message_count,
-                "dm_sent": p.dm_sent,
-            }
-            for p in question_state.participants.values()
-        ],
-    }
+    # Format: Suggestions[]
+    # Example object for reference:
+    # {
+    #   "title": "Summary Title",
+    #   "size": 0.34,
+    #   "peopleOpinions": [
+    #     {
+    #       "name": "Person",
+    #       "profilePicUrl": "...",
+    #       "message": "...",
+    #       "classification": "good",
+    #       "isExcellent": false
+    #     }
+    #   ]
+    # }
+    suggestions = []
+
+    # Use the 2-word summaries as the cluster titles (Suggestions.title)
+    for i, two_word_title in enumerate(getattr(question_state, "two_word_summaries", []) or []):
+        # Collect all messages associated with this 2-word summary (cluster)
+        cluster_messages = [
+            msg for msg in question_state.discord_messages
+            if (getattr(msg, "two_word_summary", None) or "") == two_word_title
+        ]
+        # If no messages, skip this suggestion
+        if not cluster_messages:
+            continue
+
+        # Heuristic for cluster "size" (normalized to 0-1)
+        size = len(cluster_messages) / max(1, len(question_state.discord_messages))
+
+        # People opinions for this cluster
+        people_opinions = []
+        for msg in cluster_messages:
+            people_opinions.append({
+                "name": msg.username,
+                "profilePicUrl": msg.profile_pic_url,
+                "message": msg.content,
+                "classification": (msg.classification if msg.classification in ["good", "neutral", "bad"] else "neutral"),
+                "isExcellent": bool(getattr(msg, "is_excellent", False)),
+            })
+
+        suggestions.append({
+            "title": two_word_title,
+            "size": size,
+            "peopleOpinions": people_opinions
+        })
+
+    return suggestions
 
