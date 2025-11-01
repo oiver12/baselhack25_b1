@@ -4,7 +4,7 @@ FastAPI application entry point
 import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import questions, dashboard, websocket, messages
+from app.api.routes import questions, dashboard, websocket, messages, report
 from app.config import settings
 from app.discord_bot.bot import run_bot
 
@@ -32,6 +32,7 @@ app.add_middleware(
 app.include_router(questions.router, prefix="/api", tags=["questions"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(messages.router, prefix="/api", tags=["messages"])
+app.include_router(report.router, prefix="/api", tags=["report"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
 
 

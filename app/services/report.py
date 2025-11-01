@@ -1,15 +1,17 @@
 """
 Report service for vector analysis and dimension reduction of question answers
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+import json
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from app.state import QuestionState, DiscordMessage
-from app.services.embedding_cache import get_cached_embedding, get_embeddings_batch
+from app.services.embedding_cache import get_embeddings_batch
+from app.services.summary_service import generate_two_word_summary, generate_bullet_point_summary_with_pros_cons
 
 
-async def analyze_question_responses(question_state: QuestionState) -> List[Dict[str, Any]]:
+async def make_2d_plot(question_state: QuestionState) -> List[Dict[str, Any]]:
     """
     Perform vector analysis on all answers in a QuestionState and reduce to 2D coordinates.
     
@@ -21,7 +23,7 @@ async def analyze_question_responses(question_state: QuestionState) -> List[Dict
         - message_id: str
         - x: float (between -1 and 1)
         - y: float (between -1 and 1)
-        - message: DiscordMessage object (or reference)
+        - message: DiscordMessage object
     """
     if not question_state.discord_messages:
         return []
@@ -29,34 +31,8 @@ async def analyze_question_responses(question_state: QuestionState) -> List[Dict
     # Extract message contents for embedding
     message_texts = [msg.content for msg in question_state.discord_messages]
     
-    # Get embeddings from cache first, then fetch missing ones
-    cached_embeddings = []
-    uncached_indices = []
-    uncached_messages = []
-    
-    for i, msg_text in enumerate(message_texts):
-        cached = get_cached_embedding(msg_text)
-        if cached is not None:
-            cached_embeddings.append((i, cached))
-        else:
-            uncached_indices.append(i)
-            uncached_messages.append(msg_text)
-    
-    # Fetch embeddings for messages not in cache
-    embeddings_list = [None] * len(message_texts)
-    
-    # Fill in cached embeddings
-    for idx, emb in cached_embeddings:
-        embeddings_list[idx] = emb
-    
-    # Fetch uncached embeddings if any
-    if uncached_messages:
-        uncached_embeddings = await get_embeddings_batch(uncached_messages, use_cache=True)
-        for i, uncached_idx in enumerate(uncached_indices):
-            embeddings_list[uncached_idx] = uncached_embeddings[i]
-    
-    # Convert to numpy array
-    embeddings = np.array(embeddings_list)
+    # Get embeddings directly from API without using cache
+    embeddings = await get_embeddings_batch(message_texts, use_cache=False)
     
     # Perform dimension reduction to 2D
     # Using PCA for deterministic results (t-SNE is stochastic and slower)
@@ -92,8 +68,28 @@ async def analyze_question_responses(question_state: QuestionState) -> List[Dict
             "message_id": msg.message_id,
             "x": float(coords_2d[i][0]),
             "y": float(coords_2d[i][1]),
-            "message": msg,  # Include full message object for reference
+            "message": msg.content,  # Include full message object for reference
+            "name": msg.username,
+            "profile_pic_url": msg.profile_pic_url,
         })
     
     return results
-
+    
+async def get_whole_Report(question_state: QuestionState) -> Dict[str, Any]:
+    """
+    Get the whole report for a question
+    """
+    results = await make_2d_plot(question_state)
+    summary = await generate_bullet_point_summary_with_pros_cons([msg.content for msg in question_state.discord_messages])
+    
+    # Try to parse JSON, otherwise keep as string
+    try:
+        summary_dict = json.loads(summary)
+    except json.JSONDecodeError:
+        # If not valid JSON, keep as string
+        summary_dict = summary
+    
+    return {
+        "results": results,
+        "summary": summary_dict
+    }
