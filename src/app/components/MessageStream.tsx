@@ -19,13 +19,15 @@ export default function MessageStream() {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
-    const eventSource = new EventSource("/api/webhook");
+    const ws = new WebSocket(
+      "ws://127.0.0.1:8000/ws/58eebf50-0df4-498c-9b83-99767bcb15f1",
+    );
 
-    eventSource.onopen = () => {
-      // Connection status not needed for toasts
+    ws.onopen = () => {
+      console.log("WebSocket connected");
     };
 
-    eventSource.onmessage = (event) => {
+    ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
 
@@ -89,16 +91,25 @@ export default function MessageStream() {
           }, MAX_TOAST_DURATION);
         }
       } catch (err) {
-        console.error("Error parsing message:", err);
+        console.error("Error parsing WebSocket message:", err);
       }
     };
 
-    eventSource.onerror = () => {
-      eventSource.close();
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
     };
 
     return () => {
-      eventSource.close();
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
+        ws.close();
+      }
     };
   }, []);
 
