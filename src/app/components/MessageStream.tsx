@@ -37,26 +37,26 @@ export default function MessageStream() {
         if (data.type === "message") {
           const now = Date.now();
           const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
-          
+
           setMessages((prev) => {
             // Check if this message arrives at the same time as the last one
             const lastMessage = prev[prev.length - 1];
-            const isSimultaneous = 
-              lastMessage && 
+            const isSimultaneous =
+              lastMessage &&
               (now - lastMessage.timestamp) < SIMULTANEOUS_THRESHOLD;
-            
+
             // Use the same group ID if simultaneous, otherwise get next group ID
             let groupId: number;
             if (isSimultaneous && lastMessage.groupId !== undefined) {
               groupId = lastMessage.groupId;
             } else {
               // Get the highest group ID from existing messages and add 1
-              const maxGroupId = prev.reduce((max, msg) => 
+              const maxGroupId = prev.reduce((max, msg) =>
                 Math.max(max, msg.groupId ?? -1), -1
               );
               groupId = maxGroupId + 1;
             }
-            
+
             const newMessage: ToastMessage = {
               id: messageId,
               user: data.user,
@@ -105,45 +105,50 @@ export default function MessageStream() {
     return null;
   }
 
+  // Reverse messages so newest appear on top
+  const reversedMessages = messages.slice().reverse();
+
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col-reverse gap-0 pointer-events-none">
-      {messages.map((message, index) => {
-        const reverseIndex = messages.length - 1 - index;
-        
-        // Calculate stack offset based on group membership
-        // With flex-col-reverse, newer messages (higher index) appear at top
-        // So we calculate offset based on messages that appear above (after this one in array)
-        // Messages in the same group stack more tightly together (0.5px), 
-        // different groups have normal spacing (1px)
+    <div className="fixed top-4 right-4 z-50 pointer-events-none">
+      <div className="relative">
+        {reversedMessages.map((message, index) => {
+        // Index 0 is the newest message (appears at top)
+        const reverseIndex = index;
+
+        // Calculate stack offset - messages stack downward
+        // Newest message has no offset (stays at top)
         let stackOffset = 0;
-        for (let i = index + 1; i < messages.length; i++) {
-          const aboveMessage = messages[i];
-          // If same group, use tight spacing (0.5px), otherwise normal (1px)
-          if (aboveMessage.groupId === message.groupId) {
-            stackOffset += -40;
+        for (let i = 0; i < index; i++) {
+          const msgAbove = reversedMessages[i];
+          const msgBelow = reversedMessages[i + 1];
+          // Spacing between consecutive messages
+          if (msgAbove.groupId === msgBelow.groupId) {
+            stackOffset += 20;
           } else {
-            stackOffset += -60;
+            stackOffset += 30;
           }
         }
-        
+
         const stackScale = 1 - reverseIndex * 0.05;
         const stackOpacity = 1 - reverseIndex * 0.15;
-        
+
         return (
           <div
             key={message.id}
-            className={`pointer-events-auto transition-all duration-300 ${
-              message.isExiting ? "fade-out" : "slide-in-from-right fade-in"
-            }`}
+            className={`pointer-events-auto transition-all duration-300 ${message.isExiting ? "fade-out" : "slide-in-from-right fade-in"
+              }`}
             style={{
-              transform: message.isExiting 
-                ? undefined 
-                : `translateY(${stackOffset}px) scale(${stackScale})`,
-              zIndex: reverseIndex + 1000,
+              position: 'absolute',
+              top: `${stackOffset}px`,
+              right: 0,
+              transform: message.isExiting
+                ? undefined
+                : `scale(${stackScale})`,
+              zIndex: 1000 + (reversedMessages.length - reverseIndex),
               opacity: message.isExiting ? undefined : stackOpacity,
             }}
           >
-            <article className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/95 backdrop-blur-xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/95 dark:shadow-blue-900/20 max-w-sm">
+            <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 max-w-sm">
               <div className="flex items-center gap-0">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
                   {message.user[0]?.toUpperCase()}
@@ -172,6 +177,7 @@ export default function MessageStream() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
