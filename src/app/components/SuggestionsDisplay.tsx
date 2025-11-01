@@ -659,6 +659,7 @@ export default function SuggestionsDisplay() {
                                 width={child.size * 2}
                                 height={child.size * 2}
                                 className="rounded-full w-full h-full object-cover ring-2 ring-white/50"
+                                unoptimized
                               />
                               {child.data.classification ===
                                 "sophisticated" && (
@@ -734,6 +735,7 @@ export default function SuggestionsDisplay() {
                         width={48}
                         height={48}
                         className="rounded-full ring-2 ring-indigo-400/50"
+                        unoptimized
                       />
                       <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
                         {hoveredBubble.data.classification ===

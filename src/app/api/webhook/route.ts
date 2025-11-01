@@ -2,7 +2,14 @@ import { NextRequest } from "next/server";
 import type { Message } from "@/lib/types";
 
 // Mock users and messages for webhook simulation
-const mockUsers = ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"];
+const mockUsers = [
+  { name: "Alice", profilePicUrl: "https://i.pravatar.cc/150?img=1" },
+  { name: "Bob", profilePicUrl: "https://i.pravatar.cc/150?img=12" },
+  { name: "Charlie", profilePicUrl: "https://i.pravatar.cc/150?img=13" },
+  { name: "Diana", profilePicUrl: "https://i.pravatar.cc/150?img=5" },
+  { name: "Eve", profilePicUrl: "https://i.pravatar.cc/150?img=9" },
+  { name: "Frank", profilePicUrl: "https://i.pravatar.cc/150?img=11" },
+];
 const mockMessages = [
   "Hey everyone! Great progress so far.",
   "What do you think about this approach?",
@@ -21,9 +28,11 @@ function getRandomElement<T>(array: T[]): T {
 }
 
 function generateRandomMessage(): Message {
+  const user = getRandomElement(mockUsers);
   return {
-    user: getRandomElement(mockUsers),
+    user: user.name,
     message: getRandomElement(mockMessages),
+    profilePicUrl: user.profilePicUrl,
   };
 }
 

@@ -1,6 +1,7 @@
 export type Message = {
   user: string;
   message: string;
+  profilePicUrl?: string;
 };
 
 export type OpinionClassification = "sophisticated" | "simple" | "neutral";
