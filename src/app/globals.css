@@ -36,12 +36,23 @@ body {
 
 @keyframes slide-in-from-right {
   from {
-    transform: translateX(10px);
+    transform: translateX(100%);
     opacity: 0;
   }
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
   }
 }
 
@@ -55,6 +66,10 @@ body {
 
 .slide-in-from-right {
   animation: slide-in-from-right 0.3s ease-out;
+}
+
+.fade-out {
+  animation: fade-out 0.3s ease-in forwards;
 }
 
 /* Smooth scrolling */

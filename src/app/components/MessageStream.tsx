@@ -1,27 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Message } from "@/lib/types";
 
-interface StreamMessage extends Message {
+interface ToastMessage extends Message {
   id: string;
   timestamp: number;
-  expiresAt: number;
+  isExiting?: boolean;
+  groupId?: number; // Group ID for messages that appear at the same time
 }
 
-const MESSAGE_TTL = 45_000; // 45 seconds
-const MAX_MESSAGES = 14;
+const MIN_TOAST_DURATION = 6000; // 5 seconds
+const MAX_TOAST_DURATION = 8000; // 8 seconds
+const MAX_VISIBLE_TOASTS = 5;
+const EXIT_ANIMATION_DURATION = 300; // 300ms for fade out
+const SIMULTANEOUS_THRESHOLD = 500; // Messages within 500ms are considered simultaneous
 
 export default function MessageStream() {
-  const [messages, setMessages] = useState<StreamMessage[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/webhook");
 
     eventSource.onopen = () => {
-      setIsConnected(true);
+      // Connection status not needed for toasts
     };
 
     eventSource.onmessage = (event) => {
@@ -34,23 +36,56 @@ export default function MessageStream() {
 
         if (data.type === "message") {
           const now = Date.now();
-          const newMessage: StreamMessage = {
-            id: `${now}-${Math.random().toString(16).slice(2)}`,
-            user: data.user,
-            message: data.message,
-            timestamp: now,
-            expiresAt: now + MESSAGE_TTL,
-          };
-
+          const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
+          
           setMessages((prev) => {
-            const filtered = prev.filter((message) => message.expiresAt > now);
-            // Prepend new message to show at the top
-            const updated = [newMessage, ...filtered];
-            if (updated.length > MAX_MESSAGES) {
-              return updated.slice(0, MAX_MESSAGES);
+            // Check if this message arrives at the same time as the last one
+            const lastMessage = prev[prev.length - 1];
+            const isSimultaneous = 
+              lastMessage && 
+              (now - lastMessage.timestamp) < SIMULTANEOUS_THRESHOLD;
+            
+            // Use the same group ID if simultaneous, otherwise get next group ID
+            let groupId: number;
+            if (isSimultaneous && lastMessage.groupId !== undefined) {
+              groupId = lastMessage.groupId;
+            } else {
+              // Get the highest group ID from existing messages and add 1
+              const maxGroupId = prev.reduce((max, msg) => 
+                Math.max(max, msg.groupId ?? -1), -1
+              );
+              groupId = maxGroupId + 1;
             }
-            return updated;
+            
+            const newMessage: ToastMessage = {
+              id: messageId,
+              user: data.user,
+              message: data.message,
+              timestamp: now,
+              isExiting: false,
+              groupId,
+            };
+
+            // Add new message at the end (will appear at top of stack)
+            const updated = [...prev, newMessage];
+            // Keep only the most recent messages
+            return updated.slice(-MAX_VISIBLE_TOASTS);
           });
+
+          // Auto-dismiss after duration
+          setTimeout(() => {
+            setMessages((prev) => {
+              // Mark as exiting first
+              return prev.map((msg) =>
+                msg.id === messageId ? { ...msg, isExiting: true } : msg,
+              );
+            });
+
+            // Remove after exit animation
+            setTimeout(() => {
+              setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+            }, EXIT_ANIMATION_DURATION);
+          }, MAX_TOAST_DURATION);
         }
       } catch (err) {
         console.error("Error parsing message:", err);
@@ -58,7 +93,6 @@ export default function MessageStream() {
     };
 
     eventSource.onerror = () => {
-      setIsConnected(false);
       eventSource.close();
     };
 
@@ -67,80 +101,77 @@ export default function MessageStream() {
     };
   }, []);
 
-  useEffect(() => {
-    const cleanup = setInterval(() => {
-      const now = Date.now();
-      setMessages((prev) => prev.filter((message) => message.expiresAt > now));
-    }, 5_000);
-
-    return () => {
-      clearInterval(cleanup);
-    };
-  }, []);
+  if (messages.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/70 shadow-xl shadow-blue-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-white/10 dark:shadow-blue-900/15">
-      <div className="rounded-t-3xl border-b border-white/50 bg-gradient-to-r from-white/80 via-white/60 to-white/80 px-5 py-4 dark:border-white/10 dark:from-white/10 dark:via-white/5 dark:to-white/10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight text-slate-800 dark:text-slate-100">
-            Live Feed
-          </h2>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-            <span
-              className={`flex h-2.5 w-2.5 items-center justify-center rounded-full ${
-                isConnected
-                  ? "bg-emerald-400 shadow-[0_0_12px_rgba(74,222,128,0.7)]"
-                  : "bg-rose-500 shadow-[0_0_10px_rgba(244,114,182,0.6)]"
-              }`}
-            />
-            {isConnected ? "Connected" : "Disconnected"}
-          </div>
-        </div>
-      </div>
-      <div className="relative flex-1 overflow-hidden">
-        <div
-          ref={messagesContainerRef}
-          className="h-full space-y-3 overflow-y-auto px-5 py-6"
-        >
-          {messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200/60 bg-white/60 p-6 text-sm text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-500">
-              Waiting for fresh ideas...
-            </div>
-          ) : (
-            messages.map((message) => (
-              <article
-                key={message.id}
-                className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/90 p-4 shadow-lg shadow-blue-100/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:border-white/10 dark:bg-white/10 dark:shadow-blue-900/20"
-              >
-                <div className="absolute right-4 top-4 text-[10px] uppercase tracking-[0.32em] text-slate-400/70">
-                  {new Date(message.timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+    <div className="fixed top-4 right-4 z-50 flex flex-col-reverse gap-0 pointer-events-none">
+      {messages.map((message, index) => {
+        const reverseIndex = messages.length - 1 - index;
+        
+        // Calculate stack offset based on group membership
+        // With flex-col-reverse, newer messages (higher index) appear at top
+        // So we calculate offset based on messages that appear above (after this one in array)
+        // Messages in the same group stack more tightly together (0.5px), 
+        // different groups have normal spacing (1px)
+        let stackOffset = 0;
+        for (let i = index + 1; i < messages.length; i++) {
+          const aboveMessage = messages[i];
+          // If same group, use tight spacing (0.5px), otherwise normal (1px)
+          if (aboveMessage.groupId === message.groupId) {
+            stackOffset += -40;
+          } else {
+            stackOffset += -60;
+          }
+        }
+        
+        const stackScale = 1 - reverseIndex * 0.05;
+        const stackOpacity = 1 - reverseIndex * 0.15;
+        
+        return (
+          <div
+            key={message.id}
+            className={`pointer-events-auto transition-all duration-300 ${
+              message.isExiting ? "fade-out" : "slide-in-from-right fade-in"
+            }`}
+            style={{
+              transform: message.isExiting 
+                ? undefined 
+                : `translateY(${stackOffset}px) scale(${stackScale})`,
+              zIndex: reverseIndex + 1000,
+              opacity: message.isExiting ? undefined : stackOpacity,
+            }}
+          >
+            <article className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/95 backdrop-blur-xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/95 dark:shadow-blue-900/20 max-w-sm">
+              <div className="flex items-center gap-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
+                  {message.user[0]?.toUpperCase()}
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
-                    {message.user[0]?.toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
                       {message.user}
                     </div>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                      {message.message}
-                    </p>
+                    <div className="text-sm font-regular text-slate-800 dark:text-slate-100 truncate leading-tight">
+                      {new Date(message.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
                   </div>
+                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-3">
+                    {message.message}
+                  </p>
                 </div>
-                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                  <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-        {/* Fade-out gradient at the bottom */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white/70 via-white/40 to-transparent dark:from-white/10 dark:via-white/5" />
-      </div>
+              </div>
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
+              </div>
+            </article>
+          </div>
+        );
+      })}
     </div>
   );
 }
