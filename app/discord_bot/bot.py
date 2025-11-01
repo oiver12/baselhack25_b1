@@ -8,9 +8,8 @@ from typing import Dict, List, Optional
 from app.config import settings
 from app.discord_bot.commands import handle_start_discussion
 from app.state import DiscordMessage, add_message_to_active_question, get_active_question
-from app.services.summary_service import process_single_message_for_active_question
 from app.services.question_service import check_message_relevance
-
+from app.services.pipeline import process_one
 
 class ConsensusBot(discord.Client):
     """Discord bot for consensus building"""
@@ -100,6 +99,7 @@ class ConsensusBot(discord.Client):
         
         if active_question:
             # Check if message is relevant to the active question
+            # Uses NEW_MESSAGE_THRESHOLD by default for new incoming messages
             try:
                 is_relevant = await check_message_relevance(discord_message, active_question.question)
                 
@@ -109,7 +109,7 @@ class ConsensusBot(discord.Client):
                     
                     # Process only this new message: generate summary, classify, update excellent status
                     try:
-                        await process_single_message_for_active_question(discord_message)
+                        await process_one(discord_message)
                     except Exception as e:
                         print(f"Warning: Failed to process new message for active question: {e}")
                         import traceback
