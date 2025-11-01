@@ -161,7 +161,14 @@ export default function MessageStream() {
                 opacity: message.isExiting ? undefined : stackOpacity,
               }}
             >
-              <article className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/20 backdrop-blur-2xl p-4 shadow-2xl shadow-blue-100/40 transition-all duration-300 hover:shadow-blue-200/60 dark:border-white/10 dark:bg-gray-900/20 dark:shadow-blue-900/20 w-sm">
+              <article 
+                className="group relative overflow-hidden rounded-2xl border backdrop-blur-2xl p-4 shadow-2xl transition-all duration-300 w-sm"
+                style={{
+                  borderColor: "var(--theme-message-border)",
+                  backgroundColor: "var(--theme-message-bg)",
+                  boxShadow: "0 25px 50px -12px var(--theme-message-shadow)",
+                }}
+              >
                 <div className="flex items-center gap-2">
                   {message.profilePicUrl ? (
                     <img
@@ -170,29 +177,49 @@ export default function MessageStream() {
                       className="h-10 w-10 shrink-0 rounded-full object-cover shadow-md"
                     />
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-semibold text-white shadow-md">
+                    <div 
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-semibold text-white shadow-md"
+                      style={{
+                        background: `linear-gradient(to bottom right, var(--theme-accent-blue), var(--theme-accent-purple))`,
+                      }}
+                    >
                       {message.user[0]?.toUpperCase()}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
+                      <div 
+                        className="text-sm font-semibold truncate leading-tight"
+                        style={{ color: "var(--theme-message-text)" }}
+                      >
                         {message.user}
                       </div>
-                      <div className="text-sm font-regular text-slate-800 dark:text-slate-100 truncate leading-tight">
+                      <div 
+                        className="text-sm font-regular truncate leading-tight"
+                        style={{ color: "var(--theme-message-text)" }}
+                      >
                         {new Date(message.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
                       </div>
                     </div>
-                    <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-3">
+                    <p 
+                      className="mt-1.5 text-sm leading-relaxed line-clamp-3"
+                      style={{ color: "var(--theme-message-text-secondary)" }}
+                    >
                       {message.message}
                     </p>
                   </div>
                 </div>
                 <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                  <div className="absolute inset-[-30%] bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/15 blur-3xl" />
+                  <div 
+                    className="absolute inset-[-30%] bg-gradient-to-br via-transparent blur-3xl"
+                    style={{
+                      background: `linear-gradient(to bottom right, var(--theme-accent-blue), transparent, var(--theme-accent-purple))`,
+                      opacity: 0.1,
+                    }}
+                  />
                 </div>
               </article>
             </div>

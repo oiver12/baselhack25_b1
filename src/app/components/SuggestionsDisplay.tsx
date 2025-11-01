@@ -432,8 +432,17 @@ export default function SuggestionsDisplay() {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 border-4 border-blue-200 dark:border-blue-800 border-t-blue-500 dark:border-t-blue-400 rounded-full animate-spin" />
-          <div className="text-lg font-medium text-zinc-600 dark:text-zinc-400">
+          <div 
+            className="w-16 h-16 border-4 rounded-full animate-spin"
+            style={{
+              borderColor: "var(--theme-loading-border)",
+              borderTopColor: "var(--theme-loading-border-active)",
+            }}
+          />
+          <div 
+            className="text-lg font-medium"
+            style={{ color: "var(--theme-fg-secondary)" }}
+          >
             Loading suggestions...
           </div>
         </div>
@@ -446,18 +455,35 @@ export default function SuggestionsDisplay() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-indigo-950 dark:to-purple-950 rounded-3xl shadow-2xl"
+      className="w-full h-full relative overflow-hidden rounded-3xl shadow-2xl"
+      style={{
+        background: "linear-gradient(to bottom right, var(--theme-bg-secondary), var(--theme-bg-primary), var(--theme-bg-secondary))",
+      }}
     >
       {/* Ambient background effects */}
       <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-400/20 dark:bg-blue-600/20 rounded-full blur-3xl animate-pulse" />
-        <div
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-400/20 dark:bg-purple-600/20 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "1s" }}
+        <div 
+          className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl animate-pulse"
+          style={{ 
+            backgroundColor: "var(--theme-accent-blue)",
+            opacity: "0.2",
+          }}
         />
         <div
-          className="absolute top-1/2 right-1/3 w-80 h-80 bg-pink-400/20 dark:bg-pink-600/20 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "2s" }}
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl animate-pulse"
+          style={{ 
+            animationDelay: "1s",
+            backgroundColor: "var(--theme-accent-purple)",
+            opacity: "0.2",
+          }}
+        />
+        <div
+          className="absolute top-1/2 right-1/3 w-80 h-80 rounded-full blur-3xl animate-pulse"
+          style={{ 
+            animationDelay: "2s",
+            backgroundColor: "var(--theme-accent-pink)",
+            opacity: "0.2",
+          }}
         />
       </div>
 
@@ -475,9 +501,9 @@ export default function SuggestionsDisplay() {
             x2="100%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#6366f1" stopOpacity="1" />
-            <stop offset="50%" stopColor="#8b5cf6" stopOpacity="1" />
-            <stop offset="100%" stopColor="#a855f7" stopOpacity="1" />
+            <stop offset="0%" stopColor="var(--theme-bubble-primary-from)" stopOpacity="1" />
+            <stop offset="50%" stopColor="var(--theme-bubble-primary-via)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--theme-bubble-primary-to)" stopOpacity="1" />
           </linearGradient>
           <linearGradient
             id="gradient-green"
@@ -486,12 +512,12 @@ export default function SuggestionsDisplay() {
             x2="100%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#10b981" stopOpacity="1" />
-            <stop offset="100%" stopColor="#059669" stopOpacity="1" />
+            <stop offset="0%" stopColor="var(--theme-bubble-pros-from)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--theme-bubble-pros-to)" stopOpacity="1" />
           </linearGradient>
           <linearGradient id="gradient-red" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f43f5e" stopOpacity="1" />
-            <stop offset="100%" stopColor="#e11d48" stopOpacity="1" />
+            <stop offset="0%" stopColor="var(--theme-bubble-cons-from)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--theme-bubble-cons-to)" stopOpacity="1" />
           </linearGradient>
           <linearGradient
             id="gradient-opinion"
@@ -500,12 +526,12 @@ export default function SuggestionsDisplay() {
             x2="100%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#818cf8" stopOpacity="1" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="1" />
+            <stop offset="0%" stopColor="var(--theme-bubble-opinion-from)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--theme-bubble-opinion-to)" stopOpacity="1" />
           </linearGradient>
           <linearGradient id="glass-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="white" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--theme-glass-white)" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="var(--theme-glass-white)" stopOpacity="0" />
           </linearGradient>
 
           {/* Glow filters */}
@@ -540,7 +566,7 @@ export default function SuggestionsDisplay() {
                     cy={position.y}
                     r={radius + childDistance + 80}
                     fill="none"
-                    stroke="url(#gradient-blue)"
+                    stroke="var(--theme-bubble-primary-from)"
                     strokeWidth="3"
                     opacity="0.2"
                     className="animate-pulse"
@@ -563,10 +589,10 @@ export default function SuggestionsDisplay() {
                     cy={position.y}
                     r={radius + 15}
                     fill="none"
-                    stroke="white"
+                    stroke="var(--theme-glass-white)"
                     strokeWidth="2"
                     opacity="0.4"
-                    className="dark:stroke-white/30"
+                    style={{ stroke: "var(--theme-glass-white)" }}
                   >
                     <animate
                       attributeName="r"
@@ -591,7 +617,7 @@ export default function SuggestionsDisplay() {
                   cy={position.y}
                   r={radius + childDistance + 60}
                   fill="none"
-                  stroke="url(#gradient-blue)"
+                  stroke="var(--theme-bubble-primary-from)"
                   strokeWidth="2"
                   opacity="0.15"
                   className="animate-pulse"
@@ -606,9 +632,9 @@ export default function SuggestionsDisplay() {
                   cx={position.x}
                   cy={position.y}
                   r={radius + childDistance}
-                  fill="white"
+                  fill="var(--theme-glass-white)"
                   fillOpacity="0.05"
-                  className="dark:fill-white/5 transition-all duration-300"
+                  className="transition-all duration-300"
                 />
               )}
 
@@ -626,7 +652,7 @@ export default function SuggestionsDisplay() {
                     y1={position.y}
                     x2={childX}
                     y2={childY}
-                    stroke="url(#gradient-blue)"
+                    stroke="var(--theme-bubble-primary-from)"
                     strokeWidth={isParentHovered ? "3" : "2"}
                     opacity={isParentHovered ? "0.5" : "0.2"}
                     className="transition-all duration-300"
@@ -657,9 +683,9 @@ export default function SuggestionsDisplay() {
                   cx={position.x}
                   cy={position.y}
                   r={radius + 6}
-                  fill="white"
+                  fill="var(--theme-glass-white)"
                   fillOpacity="0.3"
-                  className="dark:fill-white/10 pointer-events-none"
+                  className="pointer-events-none"
                   filter={isParentHovered ? "url(#glow)" : ""}
                 />
 
@@ -697,10 +723,11 @@ export default function SuggestionsDisplay() {
                 >
                   <div className="w-full h-full flex items-center justify-center p-6">
                     <div
-                      className="text-center text-white font-bold leading-snug break-words drop-shadow-md"
+                      className="text-center font-bold leading-snug break-words drop-shadow-md"
                       style={{
                         fontSize: `${Math.max(12, Math.min(24, radius * 0.25 - suggestion.title.length * 0.15))}px`,
                         maxHeight: `${radius * 1.4}px`,
+                        color: "var(--theme-glass-white)",
                       }}
                     >
                       {suggestion.title}
@@ -714,9 +741,8 @@ export default function SuggestionsDisplay() {
                     cx={position.x}
                     cy={position.y + radius + 15}
                     r={18}
-                    fill="white"
+                    fill="var(--theme-glass-white)"
                     fillOpacity="0.25"
-                    className="dark:fill-white/20"
                   >
                     <title>
                       Suggestion strength: {Math.round(suggestion.size * 100)}%
@@ -730,7 +756,10 @@ export default function SuggestionsDisplay() {
                     className="pointer-events-none"
                   >
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold drop-shadow">
+                      <span 
+                        className="text-xs font-bold drop-shadow"
+                        style={{ color: "var(--theme-glass-white)" }}
+                      >
                         {Math.round(suggestion.size * 100)}%
                       </span>
                     </div>
@@ -781,9 +810,9 @@ export default function SuggestionsDisplay() {
                       cx={childX}
                       cy={childY}
                       r={child.size + 4}
-                      fill="white"
+                      fill="var(--theme-glass-white)"
                       fillOpacity="0.3"
-                      className="dark:fill-white/10 pointer-events-none"
+                      className="pointer-events-none"
                     />
 
                     {/* Child bubble */}
@@ -801,7 +830,7 @@ export default function SuggestionsDisplay() {
                       cx={childX}
                       cy={childY}
                       r={child.size}
-                      fill="white"
+                      fill="var(--theme-glass-white)"
                       opacity="0.2"
                       className="pointer-events-none"
                     />
@@ -830,12 +859,18 @@ export default function SuggestionsDisplay() {
                               />
                               {child.data.classification ===
                                 "sophisticated" && (
-                                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg">
+                                <div 
+                                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg"
+                                  style={{ backgroundColor: "var(--theme-accent-yellow)" }}
+                                >
                                   <Star className="w-2.5 h-2.5 text-white fill-white" />
                                 </div>
                               )}
                               {child.data.classification === "simple" && (
-                                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+                                <div 
+                                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg"
+                                  style={{ backgroundColor: "var(--theme-accent-red)" }}
+                                >
                                   <TrendingDown className="w-2.5 h-2.5 text-white" />
                                 </div>
                               )}
@@ -889,7 +924,13 @@ export default function SuggestionsDisplay() {
             transform: "translateY(-50%)",
           }}
         >
-          <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-5 max-w-sm animate-in fade-in zoom-in-95 duration-200">
+          <div 
+            className="backdrop-blur-xl rounded-2xl shadow-2xl border p-5 max-w-sm animate-in fade-in zoom-in-95 duration-200"
+            style={{
+              backgroundColor: "var(--theme-message-bg)",
+              borderColor: "var(--theme-message-border)",
+            }}
+          >
             {hoveredBubble.type === "opinion" &&
               typeof hoveredBubble.data === "object" &&
               "name" in hoveredBubble.data && (
@@ -904,26 +945,44 @@ export default function SuggestionsDisplay() {
                         className="rounded-full ring-2 ring-indigo-400/50"
                         unoptimized
                       />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+                      <div 
+                        className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: "var(--theme-bg-primary)" }}
+                      >
                         {hoveredBubble.data.classification ===
                           "sophisticated" && (
-                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          <Star 
+                            className="w-3 h-3 fill-yellow-500" 
+                            style={{ color: "var(--theme-accent-yellow)" }}
+                          />
                         )}
                         {hoveredBubble.data.classification === "simple" && (
-                          <TrendingDown className="w-3 h-3 text-red-500" />
+                          <TrendingDown 
+                            className="w-3 h-3" 
+                            style={{ color: "var(--theme-accent-red)" }}
+                          />
                         )}
                       </div>
                     </div>
                     <div>
-                      <div className="font-bold text-gray-900 dark:text-gray-100">
+                      <div 
+                        className="font-bold"
+                        style={{ color: "var(--theme-fg-primary)" }}
+                      >
                         {hoveredBubble.data.name}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                      <div 
+                        className="text-xs capitalize"
+                        style={{ color: "var(--theme-fg-secondary)" }}
+                      >
                         {hoveredBubble.data.classification} opinion
                       </div>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  <p 
+                    className="text-sm leading-relaxed"
+                    style={{ color: "var(--theme-fg-secondary)" }}
+                  >
                     "{hoveredBubble.data.message}"
                   </p>
                 </div>
@@ -933,10 +992,18 @@ export default function SuggestionsDisplay() {
               Array.isArray(hoveredBubble.data) && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+                    <div 
+                      className="w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(to bottom right, var(--theme-bubble-pros-from), var(--theme-bubble-pros-to))`,
+                      }}
+                    >
                       <ThumbsUp className="w-4 h-4 text-white" />
                     </div>
-                    <div className="font-bold text-green-700 dark:text-green-400 text-lg">
+                    <div 
+                      className="font-bold text-lg"
+                      style={{ color: "var(--theme-accent-green)" }}
+                    >
                       Advantages
                     </div>
                   </div>
@@ -944,9 +1011,13 @@ export default function SuggestionsDisplay() {
                     {hoveredBubble.data.map((pro: string) => (
                       <li
                         key={`pro-${pro.substring(0, 20)}`}
-                        className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300"
+                        className="flex items-start gap-2 text-sm"
+                        style={{ color: "var(--theme-fg-secondary)" }}
                       >
-                        <span className="text-green-500 font-bold mt-0.5">
+                        <span 
+                          className="font-bold mt-0.5"
+                          style={{ color: "var(--theme-accent-green)" }}
+                        >
                           ✓
                         </span>
                         <span>{pro}</span>
@@ -960,10 +1031,18 @@ export default function SuggestionsDisplay() {
               Array.isArray(hoveredBubble.data) && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-400 to-rose-600 flex items-center justify-center">
+                    <div 
+                      className="w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(to bottom right, var(--theme-bubble-cons-from), var(--theme-bubble-cons-to))`,
+                      }}
+                    >
                       <ThumbsDown className="w-4 h-4 text-white" />
                     </div>
-                    <div className="font-bold text-red-700 dark:text-red-400 text-lg">
+                    <div 
+                      className="font-bold text-lg"
+                      style={{ color: "var(--theme-accent-red)" }}
+                    >
                       Challenges
                     </div>
                   </div>
@@ -971,9 +1050,15 @@ export default function SuggestionsDisplay() {
                     {hoveredBubble.data.map((con: string) => (
                       <li
                         key={`con-${con.substring(0, 20)}`}
-                        className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300"
+                        className="flex items-start gap-2 text-sm"
+                        style={{ color: "var(--theme-fg-secondary)" }}
                       >
-                        <span className="text-red-500 font-bold mt-0.5">✗</span>
+                        <span 
+                          className="font-bold mt-0.5"
+                          style={{ color: "var(--theme-accent-red)" }}
+                        >
+                          ✗
+                        </span>
                         <span>{con}</span>
                       </li>
                     ))}

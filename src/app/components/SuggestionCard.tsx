@@ -12,23 +12,16 @@ interface SuggestionCardProps {
   maxOpinions: number;
 }
 
-const palette = [
-  "from-sky-400 via-sky-500 to-blue-600",
-  "from-fuchsia-400 via-purple-500 to-indigo-600",
-  "from-emerald-400 via-teal-500 to-cyan-500",
-  "from-amber-400 via-orange-500 to-rose-500",
-  "from-pink-500 via-rose-500 to-red-500",
-  "from-cyan-400 via-blue-500 to-indigo-500",
-];
+// Get gradient colors from CSS variables
+function getCardGradient(index: number): string {
+  const gradientIndex = index % 6;
+  return `linear-gradient(to bottom right, var(--theme-card-gradient-${gradientIndex}-from), var(--theme-card-gradient-${gradientIndex}-via), var(--theme-card-gradient-${gradientIndex}-to))`;
+}
 
-const accentRings = [
-  "bg-sky-200/30",
-  "bg-purple-200/25",
-  "bg-emerald-200/30",
-  "bg-amber-200/25",
-  "bg-pink-200/25",
-  "bg-cyan-200/25",
-];
+function getAccentRingColor(index: number): string {
+  const ringIndex = index % 6;
+  return `var(--theme-accent-ring-${ringIndex})`;
+}
 
 const rotations = [
   "-rotate-6",
@@ -40,22 +33,28 @@ const rotations = [
 
 const classificationBadges: Record<
   Suggestion["peopleOpinions"][number]["classification"],
-  { label: string; className: string }
+  { label: string; style: CSSProperties }
 > = {
   sophisticated: {
     label: "Deep dive",
-    className:
-      "bg-emerald-100/80 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200",
+    style: {
+      backgroundColor: "var(--theme-badge-sophisticated-bg)",
+      color: "var(--theme-badge-sophisticated-text)",
+    },
   },
   simple: {
     label: "Quick take",
-    className:
-      "bg-sky-100/80 text-sky-700 dark:bg-sky-400/20 dark:text-sky-200",
+    style: {
+      backgroundColor: "var(--theme-badge-simple-bg)",
+      color: "var(--theme-badge-simple-text)",
+    },
   },
   neutral: {
     label: "Balanced",
-    className:
-      "bg-slate-100/80 text-slate-700 dark:bg-slate-400/20 dark:text-slate-200",
+    style: {
+      backgroundColor: "var(--theme-badge-neutral-bg)",
+      color: "var(--theme-badge-neutral-text)",
+    },
   },
 };
 
@@ -101,13 +100,14 @@ export default function SuggestionCard({
     return () => clearTimeout(timer);
   }, [index]);
 
-  const gradient = palette[index % palette.length];
-  const accent = accentRings[index % accentRings.length];
+  const gradientStyle = getCardGradient(index);
+  const accentRingColor = getAccentRingColor(index);
   const rotation = rotations[index % rotations.length];
 
   const bubbleStyle: CSSProperties = {
     padding: `${paddingY}rem ${paddingX}rem`,
-    boxShadow: `0 ${glowStrength}px ${glowStrength * 2}px -${glowStrength / 1.6}px rgba(59, 130, 246, ${0.22 + weight * 0.35})`,
+    background: gradientStyle,
+    boxShadow: `0 ${glowStrength}px ${glowStrength * 2}px -${glowStrength / 1.6}px var(--theme-accent-blue)`,
   };
 
   const titleStyle: CSSProperties = {
@@ -127,11 +127,14 @@ export default function SuggestionCard({
     >
       <div className="relative">
         <div
-          className={`absolute inset-0 blur-3xl ${accent}`}
-          style={{ opacity: 0.35 + weight * 0.5 }}
+          className="absolute inset-0 blur-3xl"
+          style={{ 
+            backgroundColor: accentRingColor,
+            opacity: 0.35 + weight * 0.5,
+          }}
         />
         <div
-          className={`relative inline-flex items-center gap-4 rounded-full bg-gradient-to-br ${gradient} px-8 py-4 shadow-xl shadow-black/10 backdrop-blur transition-all duration-500 hover:-translate-y-1 hover:rotate-0 hover:shadow-2xl dark:shadow-black/30 ${rotation}`}
+          className={`relative inline-flex items-center gap-4 rounded-full px-8 py-4 shadow-xl shadow-black/10 backdrop-blur transition-all duration-500 hover:-translate-y-1 hover:rotate-0 hover:shadow-2xl dark:shadow-black/30 ${rotation}`}
           style={bubbleStyle}
         >
           <span
@@ -140,15 +143,26 @@ export default function SuggestionCard({
           >
             {suggestion.title}
           </span>
-          <span className="hidden rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-[0.35em] text-white/90 sm:inline-flex">
+          <span 
+            className="hidden rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.35em] sm:inline-flex"
+            style={{ 
+              backgroundColor: "rgba(255, 255, 255, 0.15)",
+              color: "rgba(255, 255, 255, 0.9)",
+            }}
+          >
             {(suggestion.size * 100).toFixed(0)}% momentum
           </span>
           <div className="absolute -bottom-5 left-8 flex items-center gap-1">
             {displayedOpinions.map((opinion, i) => (
               <div
                 key={opinion.name}
-                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/60 bg-white/90 text-xs font-semibold uppercase text-slate-700 shadow-sm backdrop-blur"
-                style={{ marginLeft: i === 0 ? 0 : -14 * i }}
+                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border text-xs font-semibold uppercase shadow-sm backdrop-blur"
+                style={{ 
+                  marginLeft: i === 0 ? 0 : -14 * i,
+                  borderColor: "rgba(255, 255, 255, 0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  color: "var(--theme-fg-primary)",
+                }}
                 title={opinion.name}
               >
                 {opinion.profilePicUrl ? (
@@ -164,13 +178,22 @@ export default function SuggestionCard({
               </div>
             ))}
             {remainingCount > 0 && (
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-white/30 text-xs font-semibold text-white">
+              <div 
+                className="flex h-9 w-9 items-center justify-center rounded-full border text-xs font-semibold text-white"
+                style={{
+                  borderColor: "rgba(255, 255, 255, 0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.3)",
+                }}
+              >
                 +{remainingCount}
               </div>
             )}
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-x-10 -bottom-16 flex justify-between text-[11px] uppercase tracking-[0.32em] text-white/70">
+        <div 
+          className="pointer-events-none absolute inset-x-10 -bottom-16 flex justify-between text-[11px] uppercase tracking-[0.32em]"
+          style={{ color: "rgba(255, 255, 255, 0.7)" }}
+        >
           {highlightPro && <span>+ {highlightPro}</span>}
           {highlightContra && <span>- {highlightContra}</span>}
         </div>
@@ -181,9 +204,16 @@ export default function SuggestionCard({
           return (
             <span
               key={`${opinion.name}-${opinion.classification}`}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${badge.className}`}
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
+              style={badge.style}
             >
-              <span className="rounded-full bg-white/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:bg-white/20 dark:text-white/80">
+              <span 
+                className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.25em]"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.6)",
+                  color: "var(--theme-fg-primary)",
+                }}
+              >
                 {opinion.name}
               </span>
               {badge.label}
