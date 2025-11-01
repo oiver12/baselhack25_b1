@@ -70,6 +70,9 @@ async def make_2d_plot(question_state: QuestionState) -> List[Dict[str, Any]]:
             "message": msg.content,  # Include full message object for reference
             "name": msg.username,
             "profile_pic_url": msg.profile_pic_url,
+            "two_word_summary": msg.two_word_summary,
+            "classification": msg.classification,
+            "is_excellent": msg.is_excellent,
         })
     
     return results

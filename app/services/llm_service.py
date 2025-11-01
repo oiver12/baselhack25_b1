@@ -77,6 +77,7 @@ async def generate_bullet_point_summary_with_pros_cons(messages: List[str]) -> s
         "Respond with the 3 bullet points, no introduction or extra text. Also respond with 2 pros and 2 cons for each bullet point. "
         "Respond in this exact JSON format (no extra commentary): {\n"
         "  \"summary\": \"Summary of all the messages (approx 40 words)\",\n"
+        "  \"description\": \"Description of the problem (approx 100 words)\",\n"
         "  \"points\": [\n"
         "    {\n"
         "      \"title\": \"First bullet point\",\n"
