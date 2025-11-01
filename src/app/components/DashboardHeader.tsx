@@ -18,10 +18,16 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
     async function fetchQuestion() {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-        const response = await fetch(`${backendUrl}/api/questions/${questionId}`);
+        const response = await fetch(`${backendUrl}/api/question_and_ids`);
         if (response.ok) {
           const data = await response.json();
-          setQuestionText(data.question || "");
+          // Find the question with matching question_id
+          const questionInfo = data.find((item: { question_id: string; question: string }) => 
+            item.question_id === questionId
+          );
+          if (questionInfo) {
+            setQuestionText(questionInfo.question || "");
+          }
         }
       } catch (error) {
         console.error("Failed to fetch question:", error);
