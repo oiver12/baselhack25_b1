@@ -32,17 +32,10 @@ async def generate_two_word_summary(
         return []
     
     # Fetch existing groups from state if question_id is provided
+    # Note: Could fetch from question messages if needed, but for now just use provided existing_groups
     if question_id and not existing_groups:
-        question_state = get_question_state(question_id)
-        if question_state and question_state.suggestions:
-            existing_groups = []
-            for suggestion in question_state.suggestions:
-                # Get sample messages from people_opinions
-                sample_messages = [opinion.message for opinion in suggestion.people_opinions]
-                existing_groups.append({
-                    'title': suggestion.title,
-                    'sample_messages': sample_messages
-                })
+        # No existing groups to fetch, so use empty list
+        existing_groups = []
     
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     
@@ -369,6 +362,96 @@ async def find_excellent_message(messages: [str], class_labels: [str], question_
     
     return excellent_msg
     
+
+async def process_messages_for_question(question_id: str) -> None:
+    """
+    Process all messages for a question: generate summaries, classify, and identify excellent message.
+    Updates each message with its summary, classification, and excellence status.
+    Updates question state's two_word_summaries list.
+    
+    Args:
+        question_id: The question ID to process
+    """
+    from app.state import get_question_state
+    
+    question_state = get_question_state(question_id)
+    if not question_state or not question_state.discord_messages:
+        return
+    
+    # Get all message contents
+    messages = [msg.content for msg in question_state.discord_messages]
+    if not messages:
+        return
+    
+    # Build existing groups from current summaries
+    existing_groups = []
+    if question_state.two_word_summaries:
+        # Get sample messages for each existing summary
+        summary_to_messages = {}
+        for msg in question_state.discord_messages:
+            if msg.two_word_summary:
+                if msg.two_word_summary not in summary_to_messages:
+                    summary_to_messages[msg.two_word_summary] = []
+                summary_to_messages[msg.two_word_summary].append(msg.content)
+        
+        for summary, sample_msgs in summary_to_messages.items():
+            existing_groups.append({
+                'title': summary,
+                'sample_messages': sample_msgs[:5]  # Use first 5 as samples
+            })
+    
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    message_summaries = []
+    
+    # Generate a 2-word summary for each message
+    for i, msg_content in enumerate(messages):
+        # Check if message already has a summary
+        if question_state.discord_messages[i].two_word_summary:
+            message_summaries.append(question_state.discord_messages[i].two_word_summary)
+            continue
+        
+        # Generate individual summary (will reuse existing groups if similar)
+        single_summaries = await generate_two_word_summary(
+            [msg_content],
+            existing_groups=existing_groups if existing_groups else None,
+            question_id=question_id
+        )
+        if single_summaries:
+            message_summaries.append(single_summaries[0])
+        else:
+            # Fallback: generate directly
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that creates concise 2-word summaries. Respond with exactly 2 words separated by a space. No punctuation."},
+                    {"role": "user", "content": f"Summarize this message in exactly 2 words: {msg_content}"}
+                ],
+                max_tokens=10,
+                temperature=0.3
+            )
+            summary = response.choices[0].message.content.strip()
+            words = summary.split()[:2]
+            message_summaries.append(" ".join(words))
+    
+    # Classify all messages
+    classifications = await classify_message(messages, question_id=question_id)
+    
+    # Find excellent message
+    excellent_message = await find_excellent_message(messages, classifications, question_id=question_id)
+    
+    # Update each message object
+    for i, msg in enumerate(question_state.discord_messages):
+        msg.two_word_summary = message_summaries[i] if i < len(message_summaries) else None
+        msg.classification = classifications[i] if i < len(classifications) else "neutral"
+        msg.is_excellent = (excellent_message == msg.content) if excellent_message else False
+    
+    # Update question state's two_word_summaries list (unique summaries)
+    question_state.two_word_summaries = sorted(set(message_summaries))
+    
+    # Save cache
+    from app.state import _auto_save_cache
+    _auto_save_cache(question_id)
+
 
 async def summarize_followup_messages(user_id: str, question_id: str) -> Optional[str]:
     """

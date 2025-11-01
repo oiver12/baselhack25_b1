@@ -101,24 +101,6 @@ The bot will:
 6. Dashboard displays live updates via WebSocket
 7. Bot sends DMs to introverted users for their views
 
-## TypeScript Compatibility
-
-The API responses match the TypeScript `Suggestions` type exactly:
-
-```typescript
-type Suggestions = {
-  title: string;
-  size: number; // 0 - 1
-  pros: string[];
-  contra: string[];
-  peopleOpinions: {
-    name: string;
-    profilePicUrl: string;
-    message: string; // Summary if followup questions were asked
-    classification: "sophisticated" | "simple" | "neutral";
-  }[];
-}[];
-```
 
 ## Development Status
 

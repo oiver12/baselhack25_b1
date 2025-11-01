@@ -64,16 +64,41 @@ async def startup_event():
             print("Warning: Bot not ready after 30 seconds, skipping historical message fetch")
             return
         
-        # Fetch all historical messages in background (non-blocking)
+        # Fetch all historical messages and assign them to questions in background (non-blocking)
         async def fetch_history_background():
             print("Fetching historical Discord messages...")
             try:
                 messages = await scrape_discord_history()
                 print(f"✓ Fetched {len(messages)} historical messages")
+                
+                # Assign ALL messages to questions immediately
+                from app.services.question_service import assign_messages_to_existing_questions
+                question_ids = await assign_messages_to_existing_questions(messages)
+                print(f"✓ Assigned {len(messages)} messages to {len(question_ids)} questions")
+                
+                # Process all messages for each question: generate summaries, classify, find excellent
+                from app.services.summary_service import process_messages_for_question
+                for qid in question_ids:
+                    try:
+                        await process_messages_for_question(qid)
+                        print(f"✓ Processed messages for question {qid}")
+                    except Exception as e:
+                        print(f"Warning: Failed to process messages for question {qid}: {e}")
+                
+                # Update question_id field on messages based on assignment
+                from app.state import questions as questions_dict
+                message_to_question = {}
+                for qid, qstate in questions_dict.items():
+                    for msg in qstate.discord_messages:
+                        message_to_question[msg.message_id] = qid
+                
+                # Update question_id on all messages
+                for msg in messages:
+                    if msg.message_id in message_to_question:
+                        msg.question_id = message_to_question[msg.message_id]
+                
                 # Store in global state
                 from app.state import global_historical_messages
-                
-                # Import the set cache as well
                 from app.state import global_historical_message_ids
                 
                 # Clear and repopulate

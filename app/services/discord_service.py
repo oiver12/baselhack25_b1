@@ -250,7 +250,6 @@ async def listen_for_new_messages(question_id: str) -> None:
     # - Listen to Discord channel for new messages
     # - Filter for relevance to question
     # - Process and add to question state
-    # - Trigger suggestions update
     
     pass
 

@@ -65,6 +65,7 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
         qid = asked_questions_map[question_text]
         qstate = get_question_state(qid)
         if question_msg and not any(m.message_id == question_msg.message_id for m in qstate.discord_messages):
+            question_msg.question_id = qid  # Set question_id on the message
             qstate.discord_messages.append(question_msg)
             asked_questions[qid]['sample_messages'].append(question_msg.content)
     
@@ -126,6 +127,7 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
         msg = messages[msg_idx]
         # Only add if not already present
         if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
+            msg.question_id = qid  # Set question_id on the message
             qstate.discord_messages.append(msg)
     
     # Now cluster only the unmatched messages (if any)
@@ -169,6 +171,7 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
             # Assign message to new question
             qstate = get_question_state(new_qid)
             msg = messages[unmatched_list[0]]
+            msg.question_id = new_qid  # Set question_id on the message
             qstate.discord_messages.append(msg)
         else:
             # Multiple unmatched messages - cluster them
@@ -311,6 +314,7 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
                     msg = messages[msg_idx]
                     # Only add if not already present
                     if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
+                        msg.question_id = qid  # Set question_id on the message
                         qstate.discord_messages.append(msg)
     
     return list(updated_questions.values())
