@@ -40,7 +40,6 @@ async def periodic_clustering():
     
     while True:
         try:
-            print("Periodic clustering")
             q = get_active_question()
             if not q or not q.discord_messages:
                 await asyncio.sleep(interval)

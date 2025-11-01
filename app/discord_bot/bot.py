@@ -6,7 +6,6 @@ import discord
 from datetime import datetime
 from typing import Dict, List, Optional
 from app.config import settings
-from app.discord_bot.commands import handle_start_discussion
 from app.state import DiscordMessage, add_message_to_active_question, get_active_question
 from app.services.question_service import check_message_relevance
 from app.services.pipeline import process_one
@@ -74,25 +73,25 @@ class ConsensusBot(discord.Client):
         except Exception as e:
             print(f"Warning: Could not save global message: {e}")
 
-        # Check for start_discussion command
-        if message.content.startswith("!start_discussion"):
-            # Deduplication guard: prevent processing the same message twice
-            global _processed_start_discussion_messages
-            if message.id in _processed_start_discussion_messages:
-                print(f"Skipping duplicate !start_discussion message: {message.id}")
-                return  # Already processed, ignore
+        # # Check for start_discussion command
+        # if message.content.startswith("!start_discussion"):
+        #     # Deduplication guard: prevent processing the same message twice
+        #     global _processed_start_discussion_messages
+        #     if message.id in _processed_start_discussion_messages:
+        #         print(f"Skipping duplicate !start_discussion message: {message.id}")
+        #         return  # Already processed, ignore
             
-            # Mark as processed
-            _processed_start_discussion_messages.add(message.id)
+        #     # Mark as processed
+        #     _processed_start_discussion_messages.add(message.id)
             
-            question = message.content.replace("!start_discussion", "").strip()
-            if question:
-                await handle_start_discussion(message, question, self)
-            else:
-                await message.reply(
-                    "Please provide a question! Usage: `!start_discussion How should we change the room selection process?`"
-                )
-            return
+        #     question = message.content.replace("!start_discussion", "").strip()
+        #     if question:
+        #         await handle_start_discussion(message, question, self)
+        #     else:
+        #         await message.reply(
+        #             "Please provide a question! Usage: `!start_discussion How should we change the room selection process?`"
+        #         )
+        #     return
 
         # Check if there's an active question
         active_question = get_active_question()

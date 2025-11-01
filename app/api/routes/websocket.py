@@ -115,23 +115,7 @@ async def websocket_endpoint(websocket: WebSocket, question_id: str):
         }
         await websocket.send_json(connected_data)
 
-        # Send existing Discord messages with a small delay so they "fly through"
-        for discord_msg in question_state.discord_messages:
-            message_data = {
-                "type": "message",
-                "user": discord_msg.username,
-                "message": discord_msg.content,
-                "profilePicUrl": discord_msg.profile_pic_url,
-            }
-            await websocket.send_json(message_data)
-            await asyncio.sleep(0.1)  # 100ms delay between historical messages
-
-        # Send initial state
-        initial_data = {
-            "type": "initial",
-            "message_count": len(question_state.discord_messages),
-        }
-        await websocket.send_json(initial_data)
+        # Don't send existing messages - only send new messages that arrive after connection
 
         # Keep connection alive and wait for messages
         while True:

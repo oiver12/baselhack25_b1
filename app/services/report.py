@@ -95,6 +95,6 @@ async def get_whole_Report(question_state: QuestionState) -> Dict[str, Any]:
     
     return {
         "results": results,
-        "question": "What is the risk of using ai in business?",
+        "question": question_state.question,
         "summary": summary_dict
     }
