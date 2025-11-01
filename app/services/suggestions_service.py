@@ -12,6 +12,7 @@ from app.services.analysis_service import (
 from app.services.summary_service import (
     generate_two_word_summary,
     classify_message,
+    find_excellent_message,
     summarize_followup_messages,
 )
 
@@ -32,7 +33,17 @@ async def generate_suggestions(question_id: str) -> List[Suggestion]:
     
     messages = question_state.discord_messages
     
-    # Cluster messages by theme
+    # Classify ALL messages once upfront
+    all_message_texts = [msg.content for msg in messages]
+    all_classifications = await classify_message(all_message_texts)
+    
+    # Create a mapping from message content to classification for reuse
+    message_to_classification = dict(zip(all_message_texts, all_classifications))
+    
+    # Find excellent message once
+    excellent_message = await find_excellent_message(all_message_texts, all_classifications)
+    
+    # Cluster messages by theme - always cluster all messages
     clusters = await cluster_messages(messages)
     
     suggestions: List[Suggestion] = []
@@ -56,7 +67,8 @@ async def generate_suggestions(question_id: str) -> List[Suggestion]:
             followup_summary = await summarize_followup_messages(message.user_id, question_id)
             message_text = followup_summary if followup_summary else message.content
             
-            classification = await classify_message(message.content)
+            # Reuse pre-computed classification instead of calling again
+            classification = message_to_classification.get(message.content, "neutral")
             
             people_opinions.append(
                 PersonOpinion(
