@@ -30,8 +30,8 @@ async def make_2d_plot(question_state: QuestionState) -> List[Dict[str, Any]]:
     # Extract message contents for embedding
     message_texts = [msg.content for msg in question_state.discord_messages]
     
-    # Get embeddings directly from API without using cache
-    embeddings = await get_embeddings_batch(message_texts, use_cache=False)
+    # Get embeddings directly from API
+    embeddings = await get_embeddings_batch(message_texts, use_cache=True)
     
     # Perform dimension reduction to 2D
     # Using PCA for deterministic results (t-SNE is stochastic and slower)
