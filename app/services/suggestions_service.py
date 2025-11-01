@@ -33,15 +33,15 @@ async def generate_suggestions(question_id: str) -> List[Suggestion]:
     
     messages = question_state.discord_messages
     
-    # Classify ALL messages once upfront
+    # Classify ALL messages once upfront (using cache if available)
     all_message_texts = [msg.content for msg in messages]
-    all_classifications = await classify_message(all_message_texts)
+    all_classifications = await classify_message(all_message_texts, question_id=question_id)
     
     # Create a mapping from message content to classification for reuse
     message_to_classification = dict(zip(all_message_texts, all_classifications))
     
-    # Find excellent message once
-    excellent_message = await find_excellent_message(all_message_texts, all_classifications)
+    # Find excellent message once (using cache if available)
+    excellent_message = await find_excellent_message(all_message_texts, all_classifications, question_id=question_id)
     
     # Cluster messages by theme - always cluster all messages
     clusters = await cluster_messages(messages)
