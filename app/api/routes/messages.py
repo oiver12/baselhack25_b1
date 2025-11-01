@@ -19,6 +19,9 @@ class MessageResponse(BaseModel):
     timestamp: str
     channelId: str
     questionId: str  # Include question ID to know which question the message belongs to
+    two_word_summary: str
+    classification: str
+    is_excellent: bool
 
 
 @router.get("/messages", response_model=List[MessageResponse])
@@ -66,6 +69,9 @@ async def get_all_messages() -> List[MessageResponse]:
             timestamp=discord_msg.timestamp.isoformat(),
             channelId=discord_msg.channel_id,
             questionId=question_id or "",  # Empty string if not associated with a question
+            two_word_summary=discord_msg.two_word_summary or "",
+            classification=discord_msg.classification or "",
+            is_excellent=discord_msg.is_excellent,
         ))
     
     # Sort by timestamp (oldest first)

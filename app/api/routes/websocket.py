@@ -7,7 +7,6 @@ from typing import Dict, Set, Optional
 import json
 import asyncio
 from app.state import get_question_state
-from app.api.schemas import Suggestion
 from app.config import settings
 
 router = APIRouter()
@@ -91,7 +90,7 @@ async def websocket_endpoint(websocket: WebSocket, question_id: str):
     WebSocket endpoint for live updates
 
     WS /ws/{question_id}
-    Streams: new Suggestions updates as they're generated
+    Streams: new Discord messages in real-time
 
     Accepts connections from allowed origins (configured via CORS_ORIGINS).
     No authentication required - connections are open for development.
@@ -130,7 +129,7 @@ async def websocket_endpoint(websocket: WebSocket, question_id: str):
         # Send initial state
         initial_data = {
             "type": "initial",
-            "suggestions": [s.model_dump() for s in question_state.suggestions],
+            "message_count": len(question_state.discord_messages),
         }
         await websocket.send_json(initial_data)
 
@@ -148,15 +147,6 @@ async def websocket_endpoint(websocket: WebSocket, question_id: str):
         raise
 
 
-async def broadcast_suggestions_update(question_id: str, suggestions: list[Suggestion]):
-    """Broadcast updated suggestions to all connected clients"""
-    data = {
-        "type": "suggestions_update",
-        "suggestions": [s.model_dump() for s in suggestions],
-    }
-    await manager.broadcast_to_question(question_id, data)
-
-
 async def broadcast_discord_message(
     question_id: str, 
     username: str, 
@@ -165,7 +155,10 @@ async def broadcast_discord_message(
     message_id: Optional[str] = None,
     user_id: Optional[str] = None,
     timestamp: Optional[str] = None,
-    channel_id: Optional[str] = None
+    channel_id: Optional[str] = None,
+    two_word_summary: Optional[str] = None,
+    classification: Optional[str] = None,
+    is_excellent: bool = False,
 ):
     """Broadcast a Discord message to all connected clients"""
     # Basic message format (for backward compatibility)
@@ -188,6 +181,9 @@ async def broadcast_discord_message(
             "profilePicUrl": profile_pic_url,
             "timestamp": timestamp or "",
             "channelId": channel_id or "",
+            "two_word_summary": two_word_summary or "",
+            "classification": classification or "",
+            "is_excellent": is_excellent,
         }
         await manager.broadcast_to_question(question_id, enhanced_data)
 
@@ -212,6 +208,10 @@ async def messages_websocket_endpoint(websocket: WebSocket, question_id: str):
         "profilePicUrl": "string",
         "timestamp": "ISO8601 string",
         "channelId": "string"
+        "questionId": "string",
+        "two_word_summary": "string",
+        "classification": "string",
+        "is_excellent": bool,
     }
     """
     # Connect client (validates origin and accepts connection)

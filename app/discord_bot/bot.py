@@ -71,31 +71,58 @@ class ConsensusBot(discord.Client):
                 )
             return
 
-        # Forward messages from active discussion channels
+        # Assign new message to an existing question
         channel_id = str(message.channel.id)
-        if channel_id in self.active_discussions:
-            question_id = self.active_discussions[channel_id]
+        
+        # Try to find question_id from active discussions first
+        question_id = self.active_discussions.get(channel_id)
+        
+        # Get user avatar URL
+        profile_pic_url = (
+            message.author.display_avatar.url
+            if message.author.display_avatar
+            else ""
+        )
 
-            # Get user avatar URL
-            profile_pic_url = (
-                message.author.display_avatar.url
-                if message.author.display_avatar
-                else ""
-            )
+        # Create DiscordMessage object
+        discord_message = DiscordMessage(
+            message_id=str(message.id),
+            user_id=str(message.author.id),
+            username=message.author.display_name,
+            profile_pic_url=profile_pic_url,
+            content=message.content,
+            timestamp=message.created_at or datetime.utcnow(),
+            channel_id=channel_id,
+        )
+        
+        # If not in active discussions, try to assign to existing question using similarity
+        if not question_id:
+            from app.services.question_service import assign_messages_to_existing_questions
+            
+            # Assign this single new message to an existing question
+            question_ids = await assign_messages_to_existing_questions([discord_message])
+            
+            # Get the assigned question_id from the message
+            if discord_message.question_id:
+                question_id = discord_message.question_id
+            elif question_ids:
+                # Fallback: use the first question if message wasn't assigned
+                question_id = question_ids[0]
+                discord_message.question_id = question_id
+        else:
+            # Message is in an active discussion channel
+            discord_message.question_id = question_id
 
-            # Create DiscordMessage object
-            discord_message = DiscordMessage(
-                message_id=str(message.id),
-                user_id=str(message.author.id),
-                username=message.author.display_name,
-                profile_pic_url=profile_pic_url,
-                content=message.content,
-                timestamp=message.created_at or datetime.utcnow(),
-                channel_id=channel_id,
-            )
-
-            # Add message to question state (this will also broadcast it)
+        # Add message to question state if we have a question_id
+        if question_id:
             await add_message_to_question(question_id, discord_message)
+            
+            # Process the new message: generate summary, classify, update excellent status
+            from app.services.summary_service import process_messages_for_question
+            try:
+                await process_messages_for_question(question_id)
+            except Exception as e:
+                print(f"Warning: Failed to process new message for question {question_id}: {e}")
 
 
 
