@@ -9,7 +9,7 @@ async def process_all():
     if not q or not q.discord_messages:
         return
     if not q.clusters:
-        await cluster_manager.bootstrap_fixed_kmeans(k=4)
+        await cluster_manager.bootstrap_fixed_kmeans()
 
     for m in q.discord_messages:
         if not m.classification:
@@ -58,7 +58,7 @@ async def periodic_clustering():
             
             # Only run if we have at least 4 messages (k=4)
             if current_count >= 4:
-                await cluster_manager.bootstrap_fixed_kmeans(k=4)
+                await cluster_manager.bootstrap_fixed_kmeans()
                 print(f"Clustering: Updated {len(q.clusters)} clusters from {current_count} messages")
             else:
                 print(f"Clustering: Skipping ({current_count} messages < 4)")
