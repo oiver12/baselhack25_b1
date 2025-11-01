@@ -16,7 +16,7 @@ async def handle_start_discussion(message: discord.Message, question: str, bot):
     Args:
         message: Discord message object
         question: The question text
-        bot: The bot instance to register the channel
+        bot: The bot instance
     """
     # Call backend API to create question
     async with httpx.AsyncClient() as client:
@@ -30,10 +30,6 @@ async def handle_start_discussion(message: discord.Message, question: str, bot):
 
             question_id = data["question_id"]
             dashboard_url = data["dashboard_url"]
-
-            # Register this channel for the discussion
-            channel_id = str(message.channel.id)
-            bot.active_discussions[channel_id] = question_id
 
             # Post in Discord
             embed = discord.Embed(

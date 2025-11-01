@@ -39,6 +39,33 @@ class DiscordMessage:
         self.is_excellent = is_excellent
 
 
+def should_ignore_message_for_cache(message_content: str, user_id: Optional[str] = None, is_bot: bool = False) -> bool:
+    """
+    Check if a message should be ignored for caching and analysis.
+    
+    Ignores:
+    - !start_discussion command messages
+    - Bot messages (already filtered elsewhere, but double-check)
+    
+    Args:
+        message_content: The message content
+        user_id: Optional user ID (for future filtering if needed)
+        is_bot: Whether the message is from a bot
+        
+    Returns:
+        True if message should be ignored, False otherwise
+    """
+    # Ignore bot messages
+    if is_bot:
+        return True
+    
+    # Ignore !start_discussion commands
+    if message_content.startswith("!start_discussion"):
+        return True
+    
+    return False
+
+
 class Participant:
     """Represents a participant in a discussion"""
 
@@ -80,7 +107,7 @@ class QuestionState:
 
 
 # Global in-memory storage
-questions: Dict[str, QuestionState] = {}
+active_question: Optional[QuestionState] = None
 
 # Global storage for all historical Discord messages (fetched once on startup)
 global_historical_messages: List[DiscordMessage] = []
@@ -94,7 +121,8 @@ CACHE_DIR.mkdir(exist_ok=True)
 
 # Unified cache files
 DISCORD_MESSAGES_CACHE = CACHE_DIR / "all_discord_messages.json"
-QUESTIONS_CACHE = CACHE_DIR / "all_questions.json"
+ACTIVE_QUESTION_CACHE = CACHE_DIR / "active_question.json"
+QUESTIONS_CACHE = CACHE_DIR / "all_questions.json"  # Legacy, for migration
 
 
 def save_all_discord_messages() -> None:
@@ -160,14 +188,14 @@ def load_all_discord_messages() -> None:
 
 
 def save_all_questions() -> None:
-    """Save all question states to disk"""
+    """Save active question to disk"""
+    global active_question
     try:
-        questions_data = {}
-        for qid, state in questions.items():
-            questions_data[qid] = {
-                "question_id": state.question_id,
-                "question": state.question,
-                "created_at": state.created_at.isoformat(),
+        if active_question:
+            question_data = {
+                "question_id": active_question.question_id,
+                "question": active_question.question,
+                "created_at": active_question.created_at.isoformat(),
                 "discord_messages": [
                     {
                         "message_id": msg.message_id,
@@ -182,7 +210,7 @@ def save_all_questions() -> None:
                         "classification": msg.classification,
                         "is_excellent": msg.is_excellent,
                     }
-                    for msg in state.discord_messages
+                    for msg in active_question.discord_messages
                 ],
                 "participants": {
                     pid: {
@@ -192,73 +220,146 @@ def save_all_questions() -> None:
                         "message_count": p.message_count,
                         "dm_sent": p.dm_sent,
                     }
-                    for pid, p in state.participants.items()
+                    for pid, p in active_question.participants.items()
                 },
-                "two_word_summaries": state.two_word_summaries,
-                "message_classifications": state.message_classifications,
-                "excellent_message": state.excellent_message,
+                "two_word_summaries": active_question.two_word_summaries,
+                "message_classifications": active_question.message_classifications,
+                "excellent_message": active_question.excellent_message,
             }
+            cache_data = {"active_question": question_data}
+        else:
+            cache_data = {"active_question": None}
         
-        with open(QUESTIONS_CACHE, 'w') as f:
-            json.dump(questions_data, f, indent=2)
-        print(f"✓ Saved {len(questions_data)} questions to cache")
+        with open(ACTIVE_QUESTION_CACHE, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+        if active_question:
+            print(f"✓ Saved active question to cache")
+        else:
+            print(f"✓ Saved empty active question state to cache")
     except Exception as e:
-        print(f"Error saving questions: {e}")
+        print(f"Error saving active question: {e}")
 
 
 def load_all_questions() -> None:
-    """Load all question states from disk"""
-    if not QUESTIONS_CACHE.exists():
-        return
+    """Load active question from disk, with migration from old format"""
+    global active_question
     
-    try:
-        with open(QUESTIONS_CACHE, 'r') as f:
-            questions_data = json.load(f)
-        
-        for qid, data in questions_data.items():
-            # Create question state
-            state = QuestionState(
-                question_id=data["question_id"],
-                question=data["question"],
-                created_at=datetime.fromisoformat(data["created_at"]),
-            )
+    # Try new format first
+    if ACTIVE_QUESTION_CACHE.exists():
+        try:
+            with open(ACTIVE_QUESTION_CACHE, 'r') as f:
+                cache_data = json.load(f)
             
-            # Restore messages
-            for msg_data in data.get("discord_messages", []):
-                msg = DiscordMessage(
-                    message_id=msg_data["message_id"],
-                    user_id=msg_data["user_id"],
-                    username=msg_data["username"],
-                    profile_pic_url=msg_data["profile_pic_url"],
-                    content=msg_data["content"],
-                    timestamp=datetime.fromisoformat(msg_data["timestamp"]),
-                    channel_id=msg_data["channel_id"],
-                    question_id=msg_data.get("question_id"),
-                    two_word_summary=msg_data.get("two_word_summary"),
-                    classification=msg_data.get("classification"),
-                    is_excellent=msg_data.get("is_excellent", False),
+            question_data = cache_data.get("active_question")
+            if question_data:
+                # Restore active question
+                state = QuestionState(
+                    question_id=question_data["question_id"],
+                    question=question_data["question"],
+                    created_at=datetime.fromisoformat(question_data["created_at"]),
                 )
-                state.discord_messages.append(msg)
+                
+                # Restore messages
+                for msg_data in question_data.get("discord_messages", []):
+                    msg = DiscordMessage(
+                        message_id=msg_data["message_id"],
+                        user_id=msg_data["user_id"],
+                        username=msg_data["username"],
+                        profile_pic_url=msg_data["profile_pic_url"],
+                        content=msg_data["content"],
+                        timestamp=datetime.fromisoformat(msg_data["timestamp"]),
+                        channel_id=msg_data["channel_id"],
+                        question_id=msg_data.get("question_id"),
+                        two_word_summary=msg_data.get("two_word_summary"),
+                        classification=msg_data.get("classification"),
+                        is_excellent=msg_data.get("is_excellent", False),
+                    )
+                    state.discord_messages.append(msg)
+                
+                # Restore participants
+                for pid, p_data in question_data.get("participants", {}).items():
+                    state.participants[pid] = Participant(
+                        user_id=p_data["user_id"],
+                        username=p_data["username"],
+                        profile_pic_url=p_data["profile_pic_url"],
+                        message_count=p_data.get("message_count", 0),
+                        dm_sent=p_data.get("dm_sent", False),
+                    )
+                
+                state.two_word_summaries = question_data.get("two_word_summaries", [])
+                state.message_classifications = question_data.get("message_classifications", {})
+                state.excellent_message = question_data.get("excellent_message")
+                
+                active_question = state
+                print(f"✓ Loaded active question from cache")
+                return
+        except Exception as e:
+            print(f"Error loading active question from new format: {e}")
+    
+    # Migration: Try old format and convert
+    if QUESTIONS_CACHE.exists():
+        try:
+            with open(QUESTIONS_CACHE, 'r') as f:
+                questions_data = json.load(f)
             
-            # Restore participants
-            for pid, p_data in data.get("participants", {}).items():
-                state.participants[pid] = Participant(
-                    user_id=p_data["user_id"],
-                    username=p_data["username"],
-                    profile_pic_url=p_data["profile_pic_url"],
-                    message_count=p_data.get("message_count", 0),
-                    dm_sent=p_data.get("dm_sent", False),
-                )
-            
-            state.two_word_summaries = data.get("two_word_summaries", [])
-            state.message_classifications = data.get("message_classifications", {})
-            state.excellent_message = data.get("excellent_message")
-            
-            questions[qid] = state
-        
-        print(f"✓ Loaded {len(questions_data)} questions from cache")
-    except Exception as e:
-        print(f"Error loading questions: {e}")
+            if questions_data:
+                # Take the most recent question (by created_at) or first one
+                most_recent = None
+                most_recent_time = None
+                
+                for qid, data in questions_data.items():
+                    created_at = datetime.fromisoformat(data["created_at"])
+                    if most_recent is None or created_at > most_recent_time:
+                        most_recent = (qid, data)
+                        most_recent_time = created_at
+                
+                if most_recent:
+                    qid, data = most_recent
+                    # Create question state
+                    state = QuestionState(
+                        question_id=data["question_id"],
+                        question=data["question"],
+                        created_at=datetime.fromisoformat(data["created_at"]),
+                    )
+                    
+                    # Restore messages
+                    for msg_data in data.get("discord_messages", []):
+                        msg = DiscordMessage(
+                            message_id=msg_data["message_id"],
+                            user_id=msg_data["user_id"],
+                            username=msg_data["username"],
+                            profile_pic_url=msg_data["profile_pic_url"],
+                            content=msg_data["content"],
+                            timestamp=datetime.fromisoformat(msg_data["timestamp"]),
+                            channel_id=msg_data["channel_id"],
+                            question_id=msg_data.get("question_id"),
+                            two_word_summary=msg_data.get("two_word_summary"),
+                            classification=msg_data.get("classification"),
+                            is_excellent=msg_data.get("is_excellent", False),
+                        )
+                        state.discord_messages.append(msg)
+                    
+                    # Restore participants
+                    for pid, p_data in data.get("participants", {}).items():
+                        state.participants[pid] = Participant(
+                            user_id=p_data["user_id"],
+                            username=p_data["username"],
+                            profile_pic_url=p_data["profile_pic_url"],
+                            message_count=p_data.get("message_count", 0),
+                            dm_sent=p_data.get("dm_sent", False),
+                        )
+                    
+                    state.two_word_summaries = data.get("two_word_summaries", [])
+                    state.message_classifications = data.get("message_classifications", {})
+                    state.excellent_message = data.get("excellent_message")
+                    
+                    active_question = state
+                    # Save in new format
+                    save_all_questions()
+                    print(f"✓ Migrated question from old format to active question")
+                    return
+        except Exception as e:
+            print(f"Error loading/migrating from old format: {e}")
 
 
 def get_newest_cached_message_timestamp() -> Optional[datetime]:
@@ -283,56 +384,81 @@ def get_newest_cached_message_timestamp() -> Optional[datetime]:
     return normalize_timestamp(newest.timestamp)
 
 
+def get_active_question() -> Optional[QuestionState]:
+    """Get the active question state"""
+    return active_question
+
+
 def get_question_state(question_id: str) -> Optional[QuestionState]:
-    """Get question state by ID"""
-    return questions.get(question_id)
+    """Get question state by ID (legacy function - checks active_question)"""
+    global active_question
+    if active_question and active_question.question_id == question_id:
+        return active_question
+    return None
 
 
 def create_question_state(question_id: str, question: str) -> QuestionState:
-    """Create and store a new question state"""
+    """Create and store a new active question state (replaces any existing)"""
+    global active_question
     state = QuestionState(
         question_id=question_id,
         question=question,
         created_at=datetime.utcnow(),
     )
-    questions[question_id] = state
+    active_question = state
     return state
 
 
-async def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
-    """Add a Discord message to a question's state and broadcast it"""
-    state = questions.get(question_id)
-    if state:
-        state.discord_messages.append(message)
+async def add_message_to_active_question(message: DiscordMessage) -> None:
+    """Add a Discord message to the active question's state and broadcast it"""
+    global active_question
+    if not active_question:
+        return
+    
+    # Set question_id on message
+    message.question_id = active_question.question_id
+    
+    # Check if message already exists (avoid duplicates)
+    if any(m.message_id == message.message_id for m in active_question.discord_messages):
+        return
+    
+    active_question.discord_messages.append(message)
 
-        # Update or create participant
-        if message.user_id not in state.participants:
-            state.participants[message.user_id] = Participant(
-                user_id=message.user_id,
-                username=message.username,
-                profile_pic_url=message.profile_pic_url,
-            )
-        state.participants[message.user_id].message_count += 1
-
-        # Broadcast the message to all connected websocket clients
-        from app.api.routes.websocket import broadcast_discord_message
-
-        await broadcast_discord_message(
-            question_id=question_id,
-            username=message.username,
-            message=message.content,
-            profile_pic_url=message.profile_pic_url,
-            message_id=message.message_id,
+    # Update or create participant
+    if message.user_id not in active_question.participants:
+        active_question.participants[message.user_id] = Participant(
             user_id=message.user_id,
-            timestamp=message.timestamp.isoformat() if hasattr(message.timestamp, 'isoformat') else str(message.timestamp),
-            channel_id=message.channel_id,
-            two_word_summary=message.two_word_summary,
-            classification=message.classification,
-            is_excellent=message.is_excellent,
+            username=message.username,
+            profile_pic_url=message.profile_pic_url,
         )
-        
-        # Auto-save all caches
-        save_all_discord_messages()
-        save_all_questions()
+    active_question.participants[message.user_id].message_count += 1
+
+    # Broadcast the message to all connected websocket clients
+    from app.api.routes.websocket import broadcast_discord_message
+
+    await broadcast_discord_message(
+        question_id=active_question.question_id,
+        username=message.username,
+        message=message.content,
+        profile_pic_url=message.profile_pic_url,
+        message_id=message.message_id,
+        user_id=message.user_id,
+        timestamp=message.timestamp.isoformat() if hasattr(message.timestamp, 'isoformat') else str(message.timestamp),
+        channel_id=message.channel_id,
+        two_word_summary=message.two_word_summary,
+        classification=message.classification,
+        is_excellent=message.is_excellent,
+    )
+    
+    # Auto-save all caches
+    save_all_discord_messages()
+    save_all_questions()
+
+
+async def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
+    """Legacy function - redirects to add_message_to_active_question if question_id matches"""
+    global active_question
+    if active_question and active_question.question_id == question_id:
+        await add_message_to_active_question(message)
 
 

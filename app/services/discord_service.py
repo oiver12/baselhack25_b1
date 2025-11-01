@@ -196,6 +196,10 @@ async def _do_scrape(bot, after: Optional[datetime] = None) -> List[DiscordMessa
                             if not message.content.strip():
                                 continue
                             
+                            # Skip !start_discussion command messages
+                            if message.content.startswith("!start_discussion"):
+                                continue
+                            
                             # Get user avatar URL
                             profile_pic_url = (
                                 message.author.display_avatar.url

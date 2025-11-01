@@ -4,7 +4,7 @@ Messages endpoint for getting all Discord messages
 from fastapi import APIRouter, HTTPException
 from typing import List
 from pydantic import BaseModel
-from app.state import global_historical_messages, questions, DiscordMessage
+from app.state import global_historical_messages, get_active_question, DiscordMessage
 
 router = APIRouter()
 
@@ -35,22 +35,23 @@ async def get_all_messages() -> List[MessageResponse]:
     # Start with all historical messages from global storage
     all_discord_messages = global_historical_messages.copy()
     
-    # Also include messages from all questions (may include newer messages)
+    # Also include messages from active question (may include newer messages)
     # Build a set to avoid duplicates
     message_ids_seen = {msg.message_id for msg in all_discord_messages}
     
-    for question_state in questions.values():
-        for msg in question_state.discord_messages:
+    active_question = get_active_question()
+    if active_question:
+        for msg in active_question.discord_messages:
             # Only add if not already in historical messages (avoid duplicates)
             if msg.message_id not in message_ids_seen:
                 all_discord_messages.append(msg)
                 message_ids_seen.add(msg.message_id)
     
-    # Build a map of message_id -> question_id for messages in questions
+    # Build a map of message_id -> question_id for messages in active question
     message_to_question = {}
-    for q_id, question_state in questions.items():
-        for msg in question_state.discord_messages:
-            message_to_question[msg.message_id] = q_id
+    if active_question:
+        for msg in active_question.discord_messages:
+            message_to_question[msg.message_id] = active_question.question_id
     
     # Convert DiscordMessage objects to MessageResponse objects
     all_messages = []

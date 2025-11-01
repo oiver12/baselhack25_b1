@@ -2,17 +2,18 @@
 Question creation endpoint
 """
 
-import discord
 from fastapi import APIRouter, HTTPException
 from typing import List
 from uuid import uuid4
 from app.api.schemas import QuestionRequest, QuestionResponse, QuestionInfo
 from app.config import settings
-from app.state import create_question_state, questions, global_historical_messages
+from app.state import create_question_state, get_active_question
 from app.services.discord_service import (
     scrape_discord_history,
     send_dm_to_introverted_users,
 )
+from app.services.question_service import analyze_historical_messages_for_question
+from app.services.summary_service import process_messages_for_active_question
 
 router = APIRouter()
 
@@ -31,60 +32,17 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     print(question_id)
     print(request.question)
     
-    # Create the question state immediately
-    create_question_state(question_id, request.question)
+    # Create the question state and set as active question (replaces any existing)
+    active_question = create_question_state(question_id, request.question)
     # Save to cache
     from app.state import save_all_questions
     save_all_questions()
     
-    # Post the new question to Discord
-    from app.discord_bot.bot import get_bot_instance
+    # Analyze historical messages for relevance in background
+    # This will filter messages and add relevant ones to the question
     import asyncio
-    bot = get_bot_instance()
-    if bot and bot.is_ready():
-        # Just send to the first public text channel as a simple implementation
-        # Need to run in bot's event loop, not FastAPI's loop
-        bot_loop = bot.loop
-        current_loop = asyncio.get_event_loop()
-        
-        async def _post_question():
-            posted = False
-            if settings.DISCORD_CHANNEL_ID:
-                # Post to specific channel
-                try:
-                    channel = bot.get_channel(int(settings.DISCORD_CHANNEL_ID))
-                    if channel and isinstance(channel, discord.TextChannel):
-                        message_content = f"!start_discussion: {request.question}"
-                        await channel.send(message_content)
-                        posted = True
-                except ValueError:
-                    print(f"Warning: Invalid DISCORD_CHANNEL_ID format")
-            else:
-                # Existing behavior: post to first available channel
-                for guild in bot.guilds:
-                    for channel in guild.text_channels:
-                        if channel.permissions_for(guild.me).send_messages and not posted:
-                            message_content = f"!start_discussion: {request.question}"
-                            await channel.send(message_content)
-                            posted = True
-                            break
-                    if posted:
-                        break
-            return posted
-        
-        if bot_loop != current_loop:
-            # Run in bot's event loop using run_coroutine_threadsafe
-            future = asyncio.run_coroutine_threadsafe(_post_question(), bot_loop)
-            try:
-                future.result(timeout=10)  # 10 second timeout
-            except Exception as e:
-                print(f"Warning: Failed to post question to Discord: {e}")
-        else:
-            # Already in bot's loop, run directly
-            await _post_question()
-    else:
-        print("Warning: Bot not available or not ready to post question to Discord.")
-
+    asyncio.create_task(_analyze_historical_messages(active_question))
+    
     # Construct dashboard URL
     dashboard_url = f"{settings.DASHBOARD_BASE_URL}/{question_id}"
 
@@ -93,15 +51,30 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
         dashboard_url=dashboard_url,
     )
 
+async def _analyze_historical_messages(question):
+    """Background task to analyze historical messages for the new question"""
+    try:
+        print(f"Starting historical message analysis for question: {question.question}")
+        # Filter historical messages and add relevant ones
+        await analyze_historical_messages_for_question(question)
+        # Process all messages: generate summaries, classify, find excellent
+        await process_messages_for_active_question()
+        print(f"Completed historical message analysis for question: {question.question}")
+    except Exception as e:
+        print(f"Error analyzing historical messages: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 @router.get("/question_and_ids", response_model=List[QuestionInfo])
 async def get_question_ids() -> List[QuestionInfo]:
     """
-    Get all question IDs and questions
+    Get active question ID and question
     
     GET /api/question_and_ids
-    Response: List of QuestionInfo objects with question_id and question
+    Response: List with single QuestionInfo object (or empty if no active question)
     """
-    return [
-        QuestionInfo(question_id=qid, question=qstate.question)
-        for qid, qstate in questions.items()
-    ]
+    active_question = get_active_question()
+    if active_question:
+        return [QuestionInfo(question_id=active_question.question_id, question=active_question.question)]
+    return []

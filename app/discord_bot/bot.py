@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from app.config import settings
 from app.discord_bot.commands import handle_start_discussion
-from app.state import DiscordMessage, add_message_to_question
-from app.services.summary_service import process_single_message_for_question
-from app.services.question_service import assign_one_message_to_existing_questions
+from app.state import DiscordMessage, add_message_to_active_question, get_active_question
+from app.services.summary_service import process_single_message_for_active_question
+from app.services.question_service import check_message_relevance
 
 
 class ConsensusBot(discord.Client):
@@ -17,8 +17,6 @@ class ConsensusBot(discord.Client):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Map channel_id -> question_id for active discussions
-        self.active_discussions: Dict[str, str] = {}
 
     async def on_ready(self):
         """Called when bot is ready"""
@@ -59,18 +57,35 @@ class ConsensusBot(discord.Client):
         )
 
         # Add to global historical messages if not already present
+        # Skip meta-messages like !start_discussion commands
         try:
-            from app.state import global_historical_messages, global_historical_message_ids, save_all_discord_messages
+            from app.state import (
+                global_historical_messages, 
+                global_historical_message_ids, 
+                save_all_discord_messages,
+                should_ignore_message_for_cache
+            )
             if discord_message.message_id not in global_historical_message_ids:
-                global_historical_messages.append(discord_message)
-                global_historical_message_ids.add(discord_message.message_id)
-                # Save to cache
-                save_all_discord_messages()
+                # Check if message should be ignored
+                if not should_ignore_message_for_cache(discord_message.content, is_bot=False):
+                    global_historical_messages.append(discord_message)
+                    global_historical_message_ids.add(discord_message.message_id)
+                    # Save to cache
+                    save_all_discord_messages()
         except Exception as e:
             print(f"Warning: Could not save global message: {e}")
 
         # Check for start_discussion command
         if message.content.startswith("!start_discussion"):
+            # Deduplication guard: prevent processing the same message twice
+            global _processed_start_discussion_messages
+            if message.id in _processed_start_discussion_messages:
+                print(f"Skipping duplicate !start_discussion message: {message.id}")
+                return  # Already processed, ignore
+            
+            # Mark as processed
+            _processed_start_discussion_messages.add(message.id)
+            
             question = message.content.replace("!start_discussion", "").strip()
             if question:
                 await handle_start_discussion(message, question, self)
@@ -80,52 +95,44 @@ class ConsensusBot(discord.Client):
                 )
             return
 
-        # Assign new message to an existing question
-        channel_id = str(message.channel.id)
+        # Check if there's an active question
+        active_question = get_active_question()
         
-        # Try to find question_id from active discussions first
-        question_id = self.active_discussions.get(channel_id)
-        
-        # If not in active discussions, try to assign to existing question using similarity
-        if not question_id:
-            from app.services.question_service import assign_messages_to_existing_questions
-            
-            # Assign this single new message to an existing question (don't create new questions)
-            question_ids = await assign_one_message_to_existing_questions(discord_message, allow_new_questions=False)
-            
-            # Get the assigned question_id from the message
-            if discord_message.question_id:
-                question_id = discord_message.question_id
-            elif question_ids:
-                # Fallback: use the first question if message wasn't assigned
-                question_id = question_ids[0]
-                discord_message.question_id = question_id
-        else:
-            # Message is in an active discussion channel
-            discord_message.question_id = question_id
-
-        # Add message to question state if we have a question_id
-        if question_id:
-            await add_message_to_question(question_id, discord_message)
-            
-            # Process only this new message: generate summary, classify, update excellent status
+        if active_question:
+            # Check if message is relevant to the active question
             try:
-                await process_single_message_for_question(question_id, discord_message)
+                is_relevant = await check_message_relevance(discord_message, active_question.question)
+                
+                if is_relevant:
+                    # Message is relevant, add to active question
+                    await add_message_to_active_question(discord_message)
+                    
+                    # Process only this new message: generate summary, classify, update excellent status
+                    try:
+                        await process_single_message_for_active_question(discord_message)
+                    except Exception as e:
+                        print(f"Warning: Failed to process new message for active question: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    # Message is not relevant, ignore it (already saved to global cache)
+                    pass
             except Exception as e:
-                print(f"Warning: Failed to process new message for question {question_id}: {e}")
+                print(f"Warning: Failed to check message relevance: {e}")
                 import traceback
                 traceback.print_exc()
+        else:
+            # No active question, message already saved to global cache, ignore
+            pass
 
 
 
     async def get_all_messages(self) -> List[DiscordMessage]:
-        """Get all messages from all questions in state"""
-        # Return all Discord messages ever written (from all questions in state)
-        all_messages = []
-        from app.state import questions  # Imported here to avoid circular import at module level
-        for question_state in questions.values():
-            all_messages.extend(question_state.discord_messages)
-        return all_messages
+        """Get all messages from the active question"""
+        active_question = get_active_question()
+        if active_question:
+            return active_question.discord_messages
+        return []
 
 
 def create_bot() -> ConsensusBot:
@@ -137,6 +144,9 @@ def create_bot() -> ConsensusBot:
 
 # Global reference to the bot instance for accessing it from other modules
 _bot_instance: Optional[ConsensusBot] = None
+
+# Track processed !start_discussion message IDs to prevent duplicate handling
+_processed_start_discussion_messages: set = set()
 
 
 def get_bot_instance() -> Optional[ConsensusBot]:

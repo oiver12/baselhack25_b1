@@ -6,18 +6,15 @@ from typing import Dict, List, Optional, Any
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from openai import OpenAI
-from app.state import QuestionState, DiscordMessage, get_question_state
+from app.state import QuestionState, DiscordMessage, get_active_question
 from app.config import settings
 from app.services.solution_service import analyze_cluster
 
 
-async def get_total_guild_members(question_id: str) -> int:
+async def get_total_guild_members() -> int:
     """
     Get total number of non-bot members in the Discord guild
     
-    Args:
-        question_id: The question ID (to find a message and get channel/guild)
-        
     Returns:
         Total number of non-bot members in the guild, or 0 if unable to determine
     """
@@ -27,7 +24,7 @@ async def get_total_guild_members(question_id: str) -> int:
     if not bot or not bot.is_ready():
         return 0
     
-    question_state = get_question_state(question_id)
+    question_state = get_active_question()
     if not question_state or not question_state.discord_messages:
         return 0
     
@@ -161,24 +158,21 @@ def check_consensus_conditions(metrics: Dict[str, float]) -> bool:
     )
 
 
-async def detect_consensus_for_question(question_id: str) -> List[Dict[str, Any]]:
+async def detect_consensus_for_active_question() -> List[Dict[str, Any]]:
     """
-    Detect consensus for all clusters in a question
+    Detect consensus for all clusters in the active question
     
-    Args:
-        question_id: The question ID to check
-        
     Returns:
         List of consensus events (empty if none detected)
     """
-    question_state = get_question_state(question_id)
+    question_state = get_active_question()
     if not question_state or not question_state.discord_messages:
         return []
     
     all_messages = question_state.discord_messages
     
     # Get total guild members (all users in the Discord server, not just those who wrote)
-    total_guild_members = await get_total_guild_members(question_id)
+    total_guild_members = await get_total_guild_members()
     
     # Group messages by their 2-word summary (cluster label)
     clusters: Dict[str, List[DiscordMessage]] = {}
@@ -209,7 +203,7 @@ async def detect_consensus_for_question(question_id: str) -> List[Dict[str, Any]
         if check_consensus_conditions(metrics):
             # Call solution analysis pipeline
             solution = await analyze_cluster(
-                question_id=question_id,
+                question_id=question_state.question_id,
                 cluster_label=cluster_label,
                 cluster_messages=cluster_messages,
                 cluster_metrics=metrics,
@@ -220,7 +214,7 @@ async def detect_consensus_for_question(question_id: str) -> List[Dict[str, Any]
                 event = {
                     "event": "consensus_detected",
                     "payload": {
-                        "question_id": question_id,
+                        "question_id": question_state.question_id,
                         "cluster_label": cluster_label,
                         "solution": solution.get("text", ""),
                         "confidence": solution.get("confidence", 0.0),
@@ -233,19 +227,19 @@ async def detect_consensus_for_question(question_id: str) -> List[Dict[str, Any]
     return consensus_events
 
 
-async def check_and_broadcast_consensus(question_id: str) -> None:
+async def check_and_broadcast_consensus() -> None:
     """
-    Check for consensus and broadcast events if detected
-    
-    Args:
-        question_id: The question ID to check
+    Check for consensus in the active question and broadcast events if detected
     """
-    consensus_events = await detect_consensus_for_question(question_id)
+    consensus_events = await detect_consensus_for_active_question()
     
     # Broadcast events via WebSocket
     if consensus_events:
         from app.api.routes.websocket import broadcast_consensus_event
+        from app.state import get_active_question
         
-        for event in consensus_events:
-            await broadcast_consensus_event(question_id, event["payload"])
+        active_question = get_active_question()
+        if active_question:
+            for event in consensus_events:
+                await broadcast_consensus_event(active_question.question_id, event["payload"])
 
