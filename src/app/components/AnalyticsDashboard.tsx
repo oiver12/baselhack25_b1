@@ -8,7 +8,9 @@ import {
   TrendingUp, 
   BarChart3,
   Star,
-  Circle
+  Circle,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 interface AnalyticsDashboardProps {
@@ -38,6 +40,7 @@ interface AnalyticsData {
 export default function AnalyticsDashboard({ suggestions, questionText = "How should we improve the city's public transportation system?", containerRef }: AnalyticsDashboardProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelDimensions, setPanelDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Update panel dimensions for exclusion zone
   useEffect(() => {
@@ -139,31 +142,62 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
       
       {/* Header */}
       <div 
-        className="p-5 border-b"
+        className={`p-5 ${!isMinimized ? "border-b" : ""}`}
         style={{ borderColor: "var(--theme-bg-tertiary)" }}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <BarChart3 
-            className="w-5 h-5" 
-            style={{ color: "var(--theme-accent-blue)" }}
-          />
-          <h2 
-            className="text-lg font-bold"
-            style={{ color: "var(--theme-fg-primary)" }}
+        <div className={`flex items-center justify-between gap-2 ${!isMinimized ? "mb-2" : ""}`}>
+          <div className="flex items-center gap-2">
+            <BarChart3 
+              className="w-5 h-5" 
+              style={{ color: "var(--theme-accent-blue)" }}
+            />
+            <h2 
+              className="text-lg font-bold"
+              style={{ color: "var(--theme-fg-primary)" }}
+            >
+              Analytics
+            </h2>
+          </div>
+          <button
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="p-1.5 rounded-lg transition-colors cursor-pointer"
+            style={{ 
+              backgroundColor: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--theme-bg-secondary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+            aria-label={isMinimized ? "Expand analytics" : "Minimize analytics"}
           >
-            Analytics
-          </h2>
+            {isMinimized ? (
+              <ChevronUp 
+                className="w-4 h-4" 
+                style={{ color: "var(--theme-fg-secondary)" }}
+              />
+            ) : (
+              <ChevronDown 
+                className="w-4 h-4" 
+                style={{ color: "var(--theme-fg-secondary)" }}
+              />
+            )}
+          </button>
         </div>
-        <p 
-          className="text-sm line-clamp-2 mt-2"
-          style={{ color: "var(--theme-fg-secondary)" }}
-          title={questionText}
-        >
-          {questionText}
-        </p>
+        {!isMinimized && (
+          <p 
+            className="text-sm line-clamp-2 mt-2"
+            style={{ color: "var(--theme-fg-secondary)" }}
+            title={questionText}
+          >
+            {questionText}
+          </p>
+        )}
       </div>
 
       {/* Content */}
+      {!isMinimized && (
       <div className="p-5 space-y-6 max-h-[calc(100vh-20rem)] overflow-y-auto">
             {/* Overview Stats */}
             <div className="grid grid-cols-2 gap-3">
@@ -417,6 +451,7 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
               </div>
             </div>
           </div>
+      )}
     </div>
   );
 }
