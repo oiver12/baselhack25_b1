@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 from app.config import settings
 from app.discord_bot.commands import handle_start_discussion
 from app.state import DiscordMessage, add_message_to_question
+from app.services.summary_service import process_single_message_for_question
 
 
 class ConsensusBot(discord.Client):
@@ -40,7 +41,7 @@ class ConsensusBot(discord.Client):
             else ""
         )
 
-        # Create DiscordMessage object
+        # Create DiscordMessage object (summary and classification will be set later in process_single_message_for_question)
         discord_message = DiscordMessage(
             message_id=str(message.id),
             user_id=str(message.author.id),
@@ -77,30 +78,12 @@ class ConsensusBot(discord.Client):
         # Try to find question_id from active discussions first
         question_id = self.active_discussions.get(channel_id)
         
-        # Get user avatar URL
-        profile_pic_url = (
-            message.author.display_avatar.url
-            if message.author.display_avatar
-            else ""
-        )
-
-        # Create DiscordMessage object
-        discord_message = DiscordMessage(
-            message_id=str(message.id),
-            user_id=str(message.author.id),
-            username=message.author.display_name,
-            profile_pic_url=profile_pic_url,
-            content=message.content,
-            timestamp=message.created_at or datetime.utcnow(),
-            channel_id=channel_id,
-        )
-        
         # If not in active discussions, try to assign to existing question using similarity
         if not question_id:
             from app.services.question_service import assign_messages_to_existing_questions
             
-            # Assign this single new message to an existing question
-            question_ids = await assign_messages_to_existing_questions([discord_message])
+            # Assign this single new message to an existing question (don't create new questions)
+            question_ids = await assign_messages_to_existing_questions([discord_message], allow_new_questions=False)
             
             # Get the assigned question_id from the message
             if discord_message.question_id:
@@ -117,12 +100,13 @@ class ConsensusBot(discord.Client):
         if question_id:
             await add_message_to_question(question_id, discord_message)
             
-            # Process the new message: generate summary, classify, update excellent status
-            from app.services.summary_service import process_messages_for_question
+            # Process only this new message: generate summary, classify, update excellent status
             try:
-                await process_messages_for_question(question_id)
+                await process_single_message_for_question(question_id, discord_message)
             except Exception as e:
                 print(f"Warning: Failed to process new message for question {question_id}: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 

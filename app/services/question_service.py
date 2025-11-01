@@ -22,15 +22,24 @@ async def extract_asked_questions(messages: List[DiscordMessage]) -> List[str]:
             asked_questions.add(message.content)
     return list(asked_questions)
 
-async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) -> List[str]:
+async def assign_messages_to_existing_questions(messages: List[DiscordMessage], allow_new_questions: bool = True) -> List[str]:
     """
     Assign messages to existing questions using clustering.
     First tries to assign to questions extracted from !start_discussion commands,
     then creates up to 3 additional questions from remaining messages (unless <5 messages).
-    Returns the final list of question_ids.
+    
+    Args:
+        messages: List of messages to assign
+        allow_new_questions: If False, only map to existing questions, don't create new ones
+    
+    Returns:
+        Final list of question_ids that received messages
     """
     if not messages:
         return []
+    
+    # Track question IDs that receive messages in this call
+    questions_receiving_messages = set()
     
     # First, extract asked questions from !start_discussion commands
     asked_questions_list = await extract_asked_questions(messages)
@@ -38,6 +47,9 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
     asked_questions_map = {}  # question_text -> question_id
     
     # Create question states for asked questions
+    # First, check if questions with this text already exist
+    existing_questions_by_text = {qstate.question: qid for qid, qstate in questions.items()}
+    
     for asked_q_text in asked_questions_list:
         # Extract the actual question (remove "!start_discussion" prefix)
         question_text = asked_q_text.replace("!start_discussion", "").strip()
@@ -52,9 +64,15 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
                 break
         
         if question_text not in asked_questions_map:
-            # Create new question
-            new_qid = str(uuid.uuid4())
-            create_question_state(new_qid, question_text)
+            # Check if a question with this text already exists
+            if question_text in existing_questions_by_text:
+                # Use existing question
+                new_qid = existing_questions_by_text[question_text]
+            else:
+                # Create new question
+                new_qid = str(uuid.uuid4())
+                create_question_state(new_qid, question_text)
+            
             asked_questions_map[question_text] = new_qid
             asked_questions[new_qid] = {
                 'title': question_text,
@@ -68,6 +86,7 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
             question_msg.question_id = qid  # Set question_id on the message
             qstate.discord_messages.append(question_msg)
             asked_questions[qid]['sample_messages'].append(question_msg.content)
+            questions_receiving_messages.add(qid)
     
     # Get all current questions (id and text) and their sample messages (including asked questions)
     current_questions = {qid: get_question_state(qid).question for qid in questions.keys()}
@@ -75,18 +94,12 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
     
     existing_groups = [asked_questions[qid] for qid in asked_questions.keys()]
     
-    # Track all question IDs
-    updated_questions = dict(question_ids_by_text)
-    for qid in asked_questions_map.values():
-        qstate = get_question_state(qid)
-        updated_questions[qstate.question] = qid
-    
     all_message_texts = [msg.content for msg in messages]
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     
     # Generate embeddings for all messages
     if len(all_message_texts) == 0:
-        return list(question_ids_by_text.values())
+        return list(questions_receiving_messages)
     
     embedding_response = client.embeddings.create(
         input=all_message_texts,
@@ -98,9 +111,29 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
     matched_to_existing = {}  # message_idx -> (question_id, question_title)
     unmatched_indices = set(range(len(messages)))
     
+    # Build complete list of all existing questions (not just from !start_discussion)
+    all_existing_groups = []
+    
+    # Add asked questions groups
     if existing_groups:
+        all_existing_groups.extend(existing_groups)
+    
+    # Add all other existing questions that aren't in asked_questions
+    asked_qids = set(asked_questions.keys())
+    for qid, qstate in questions.items():
+        if qid not in asked_qids and qstate.discord_messages:
+            # Get sample messages from this question
+            sample_messages = [msg.content for msg in qstate.discord_messages[:5]]
+            all_existing_groups.append({
+                'question_id': qid,
+                'title': qstate.question,
+                'sample_messages': sample_messages
+            })
+    
+    # Match messages to all existing questions
+    if all_existing_groups:
         # For each existing question, get representative embeddings
-        for group in existing_groups:
+        for group in all_existing_groups:
             if not group['sample_messages']:
                 continue
                 
@@ -116,8 +149,10 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
             max_similarities = np.max(similarities, axis=1)  # Max similarity per message
             
             # Match messages with similarity >= 0.5 to this question (lowered to match more to existing)
+            # If allow_new_questions is False, use a lower threshold to match more aggressively
+            threshold = 0.3 if not allow_new_questions else 0.5
             for msg_idx in list(unmatched_indices):
-                if max_similarities[msg_idx] >= 0.5:
+                if max_similarities[msg_idx] >= threshold:
                     matched_to_existing[msg_idx] = (group['question_id'], group['title'])
                     unmatched_indices.remove(msg_idx)
     
@@ -129,9 +164,11 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
         if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
             msg.question_id = qid  # Set question_id on the message
             qstate.discord_messages.append(msg)
+            questions_receiving_messages.add(qid)
     
     # Now cluster only the unmatched messages (if any)
-    if unmatched_indices:
+    # Only create new questions if allow_new_questions is True
+    if unmatched_indices and allow_new_questions:
         unmatched_list = list(unmatched_indices)
         unmatched_messages = [all_message_texts[i] for i in unmatched_list]
         unmatched_embeddings = embeddings[unmatched_list]
@@ -166,13 +203,13 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
             # Create new question
             new_qid = str(uuid.uuid4())
             create_question_state(new_qid, question_title)
-            updated_questions[question_title] = new_qid
             
             # Assign message to new question
             qstate = get_question_state(new_qid)
             msg = messages[unmatched_list[0]]
             msg.question_id = new_qid  # Set question_id on the message
             qstate.discord_messages.append(msg)
+            questions_receiving_messages.add(new_qid)
         else:
             # Multiple unmatched messages - cluster them
             # Calculate cosine similarity matrix for unmatched messages
@@ -295,15 +332,18 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
                             break
                 
                 # Create new question if it doesn't already exist and wasn't matched
-                if not matched_to_existing_q and question_title not in updated_questions:
-                    new_qid = str(uuid.uuid4())
-                    create_question_state(new_qid, question_title)
-                    updated_questions[question_title] = new_qid
-                    qid = new_qid
+                if not matched_to_existing_q:
+                    # Check if question already exists by text
+                    if question_title in question_ids_by_text:
+                        qid = question_ids_by_text[question_title]
+                    else:
+                        new_qid = str(uuid.uuid4())
+                        create_question_state(new_qid, question_title)
+                        qid = new_qid
                 elif matched_to_existing_q:
                     pass  # qid already set above
                 else:
-                    qid = updated_questions[question_title]
+                    qid = question_ids_by_text[question_title]
                 
                 qstate = get_question_state(qid)
                 
@@ -316,5 +356,6 @@ async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) 
                     if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
                         msg.question_id = qid  # Set question_id on the message
                         qstate.discord_messages.append(msg)
+                        questions_receiving_messages.add(qid)
     
-    return list(updated_questions.values())
+    return list(questions_receiving_messages)

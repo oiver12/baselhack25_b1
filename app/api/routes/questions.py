@@ -29,6 +29,10 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     question_id = str(uuid4())
     print(question_id)
     print(request.question)
+    
+    # Create the question state immediately
+    create_question_state(question_id, request.question)
+    
     # Post the new question to Discord
     from app.discord_bot.bot import get_bot_instance
     import asyncio
