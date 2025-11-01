@@ -74,6 +74,12 @@ class QuestionState:
 # Global in-memory storage
 questions: Dict[str, QuestionState] = {}
 
+# Global storage for all historical Discord messages (fetched once on startup)
+global_historical_messages: List[DiscordMessage] = []
+
+# Set cache for efficient duplicate checking of message IDs
+global_historical_message_ids: set = set()
+
 # Cache directory for persistent storage
 CACHE_DIR = Path("data")
 CACHE_DIR.mkdir(exist_ok=True)
@@ -168,6 +174,10 @@ async def add_message_to_question(question_id: str, message: DiscordMessage) -> 
             username=message.username,
             message=message.content,
             profile_pic_url=message.profile_pic_url,
+            message_id=message.message_id,
+            user_id=message.user_id,
+            timestamp=message.timestamp.isoformat() if hasattr(message.timestamp, 'isoformat') else str(message.timestamp),
+            channel_id=message.channel_id,
         )
 
 
