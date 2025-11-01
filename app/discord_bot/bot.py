@@ -29,6 +29,11 @@ class ConsensusBot(discord.Client):
         # Don't respond to bot's own messages
         if message.author == self.user:
             return
+        
+        # Filter by channel if configured
+        if settings.DISCORD_CHANNEL_ID:
+            if str(message.channel.id) != settings.DISCORD_CHANNEL_ID:
+                return  # Ignore messages from other channels
 
         print(f"Message from {message.author}: {message.content}")
         # Mark: add all messages (even those not starting with !start_discussion) to display at message endpoint

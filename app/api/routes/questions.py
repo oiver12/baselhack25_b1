@@ -2,6 +2,7 @@
 Question creation endpoint
 """
 
+import discord
 from fastapi import APIRouter, HTTPException
 from typing import List
 from uuid import uuid4
@@ -48,15 +49,27 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
         
         async def _post_question():
             posted = False
-            for guild in bot.guilds:
-                for channel in guild.text_channels:
-                    if channel.permissions_for(guild.me).send_messages and not posted:
+            if settings.DISCORD_CHANNEL_ID:
+                # Post to specific channel
+                try:
+                    channel = bot.get_channel(int(settings.DISCORD_CHANNEL_ID))
+                    if channel and isinstance(channel, discord.TextChannel):
                         message_content = f"!start_discussion: {request.question}"
                         await channel.send(message_content)
                         posted = True
+                except ValueError:
+                    print(f"Warning: Invalid DISCORD_CHANNEL_ID format")
+            else:
+                # Existing behavior: post to first available channel
+                for guild in bot.guilds:
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).send_messages and not posted:
+                            message_content = f"!start_discussion: {request.question}"
+                            await channel.send(message_content)
+                            posted = True
+                            break
+                    if posted:
                         break
-                if posted:
-                    break
             return posted
         
         if bot_loop != current_loop:
