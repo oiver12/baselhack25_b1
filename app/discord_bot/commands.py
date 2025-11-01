@@ -2,18 +2,18 @@
 Discord bot command handlers
 """
 import httpx
-from discord.ext import commands
+import discord
 from app.config import settings
 
 
-async def handle_start_discussion(ctx: commands.Context, question: str):
+async def handle_start_discussion(message: discord.Message, question: str):
     """
     Handle the !start_discussion command
     
     Creates a question via API and posts response in Discord
     
     Args:
-        ctx: Discord context
+        message: Discord message object
         question: The question text
     """
     # Call backend API to create question
@@ -41,10 +41,10 @@ async def handle_start_discussion(ctx: commands.Context, question: str):
                 inline=False,
             )
             
-            await ctx.send(embed=embed)
+            await message.reply(embed=embed)
             
         except httpx.HTTPError as e:
-            await ctx.send(f"Error creating discussion: {e}")
+            await message.reply(f"Error creating discussion: {e}")
         except Exception as e:
-            await ctx.send(f"Unexpected error: {e}")
+            await message.reply(f"Unexpected error: {e}")
 

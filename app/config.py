@@ -1,12 +1,18 @@
 """
 Application configuration
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
 class Settings(BaseSettings):
     """Application settings"""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",  # Ignore extra environment variables
+    )
     
     # API Settings
     API_TITLE: str = "BaselHack25 Consensus Builder API"
@@ -22,10 +28,6 @@ class Settings(BaseSettings):
     
     # Application Settings
     DASHBOARD_BASE_URL: str = "https://yourapp.com/dashboard"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()

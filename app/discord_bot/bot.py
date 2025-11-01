@@ -2,47 +2,43 @@
 Discord bot main class
 """
 import discord
-from discord.ext import commands
 from app.config import settings
 from app.discord_bot.commands import handle_start_discussion
 
 
-class ConsensusBot(commands.Bot):
+class ConsensusBot(discord.Client):
     """Discord bot for consensus building"""
-    
-    def __init__(self):
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.members = True
-        
-        super().__init__(command_prefix="!", intents=intents)
-    
-    async def setup_hook(self):
-        """Called when bot is starting up"""
-        # Register commands
-        await self.add_command(self.start_discussion)
     
     async def on_ready(self):
         """Called when bot is ready"""
-        print(f"{self.user} has connected to Discord!")
+        print(f'Logged on as {self.user}!')
     
-    @commands.command(name="start_discussion")
-    async def start_discussion(self, ctx: commands.Context, *, question: str):
-        """
-        Command to start a new discussion
+    async def on_message(self, message):
+        """Handle incoming messages"""
+        # Don't respond to bot's own messages
+        if message.author == self.user:
+            return
         
-        Usage: !start_discussion How should we change the room selection process?
-        """
-        await handle_start_discussion(ctx, question)
+        print(f'Message from {message.author}: {message.content}')
+        
+        # Check for start_discussion command
+        if message.content.startswith('!start_discussion'):
+            question = message.content.replace('!start_discussion', '').strip()
+            if question:
+                await handle_start_discussion(message, question)
+            else:
+                await message.reply("Please provide a question! Usage: `!start_discussion How should we change the room selection process?`")
 
 
 def create_bot() -> ConsensusBot:
     """Create and return bot instance"""
-    return ConsensusBot()
+    intents = discord.Intents.default()
+    intents.message_content = True
+    return ConsensusBot(intents=intents)
 
 
-async def start_bot():
-    """Start the Discord bot"""
+def run_bot():
+    """Run the Discord bot (blocking)"""
     bot = create_bot()
-    await bot.start(settings.DISCORD_BOT_TOKEN)
+    bot.run(settings.DISCORD_BOT_TOKEN)
 
