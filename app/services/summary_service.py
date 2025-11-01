@@ -233,86 +233,141 @@ async def generate_two_word_summary(
 
     
 
-async def classify_message(message: [str]) -> [str]:
+async def classify_message(message: [str], question_id: Optional[str] = None) -> [str]:
     """
-    Classify messages as good, neutral or bad 
+    Classify messages as good, neutral or bad.
+    Uses cache if question_id is provided to avoid re-classifying messages.
     
     Args:
-        messages: Messages text
+        message: Messages text
+        question_id: Optional question ID to use cache
         
     Returns:
         Classification: "good", "neutral" or "bad"
     """
-    # TODO: Implement message classification
-    # - Analyze message complexity
-    # - Check length, vocabulary, structure
-    # - Classify based on criteria
-    # Use OpenAI to classify each message as 'good', 'neutral' or 'bad'
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    # Try to get cached classifications if question_id is provided
+    cached_classifications = {}
+    uncached_messages = []
+    uncached_indices = []
+    
+    if question_id:
+        question_state = get_question_state(question_id)
+        if question_state and question_state.message_classifications:
+            cached_classifications = question_state.message_classifications.copy()  # Use copy to avoid modifying original
+    
+    # Separate cached and uncached messages
+    for idx, msg in enumerate(message):
+        if msg in cached_classifications:
+            continue  # Will use cached value
+        else:
+            uncached_messages.append(msg)
+            uncached_indices.append(idx)
+    
+    # Classify only uncached messages
+    if uncached_messages:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        for msg in uncached_messages:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant. Classify the following message as 'good', 'neutral' or 'bad'. Respond with ONLY 'good', 'neutral' or 'bad'."},
+                    {"role": "user", "content": f"Classify this message: {msg}"}
+                ],
+                max_tokens=2,
+                temperature=0.0,
+            )
+            label = response.choices[0].message.content.strip().lower()
+            if label not in {"good", "neutral", "bad"}:
+                label = "neutral"
+            
+            # Cache the result if question_id is provided
+            if question_id:
+                question_state = get_question_state(question_id)
+                if question_state:
+                    question_state.message_classifications[msg] = label
+                    # Auto-save cache to file
+                    from app.state import _auto_save_cache
+                    _auto_save_cache(question_id)
+            cached_classifications[msg] = label
+    
+    # Build results array in original order
     results = []
     for msg in message:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant. Classify the following message as 'good', 'neutral' or 'bad'. Respond with ONLY 'good', 'neutral' or 'bad'."},
-                {"role": "user", "content": f"Classify this message: {msg}"}
-            ],
-            max_tokens=2,
-            temperature=0.0,
-        )
-        label = response.choices[0].message.content.strip().lower()
-        if label not in {"good", "neutral", "bad"}:
-            label = "neutral"
-        results.append(label)
+        results.append(cached_classifications.get(msg, "neutral"))
+    
     return results
 
-async def find_excellent_message(messages: [str], class_labels: [str]) -> str:
+async def find_excellent_message(messages: [str], class_labels: [str], question_id: Optional[str] = None) -> str:
     """
-    Find the excellent message in a list of messages
+    Find the excellent message in a list of messages.
+    Uses cache if question_id is provided to avoid re-evaluating.
     
     Args:
         messages: Messages text
         class_labels: Class labels
+        question_id: Optional question ID to use cache
         
     Returns:
         Excellent message
     """
-    # INSERT_YOUR_CODE
+    # Check cache first if question_id is provided
+    if question_id:
+        question_state = get_question_state(question_id)
+        if question_state and question_state.excellent_message:
+            # Verify the cached excellent message is still in the current messages
+            if question_state.excellent_message in messages:
+                return question_state.excellent_message
+    
     # Filter out messages with class label 'bad'
     filtered_messages = [msg for msg, label in zip(messages, class_labels) if label == "good"]
     if not filtered_messages:
-        return None  # or you might want to return a default/fallback value
-    # INSERT_YOUR_CODE
+        return None
+    
     # If only one good message, return it
     if len(filtered_messages) == 1:
-        return filtered_messages[0]
-    # Use OpenAI to select the "most excellent" from filtered good messages
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    prompt = (
-        "Given the following messages, select the single one that best exemplifies clarity, helpfulness, and quality. "
-        "Return only the exact message text (no explanation, no extra text):\n\n"
-    )
-    for idx, msg in enumerate(filtered_messages):
-        prompt += f"{idx+1}. {msg}\n"
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a wise evaluator of messages."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=400,
-        temperature=0.0,
-    )
-    result_message = response.choices[0].message.content.strip()
-    # If result is not in filtered_messages, fall back to first good
-    if result_message in filtered_messages:
-        return result_message
+        excellent_msg = filtered_messages[0]
     else:
-        # Sometimes LLM might return a snippet, attempt fuzzy match
-        for msg in filtered_messages:
-            if result_message in msg or msg in result_message:
-                return msg
-        return filtered_messages[0]
+        # Use OpenAI to select the "most excellent" from filtered good messages
+        print("sending message to openai asdöflkjsaödlkfjasödlkfjösaldjföalksdjf")
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        prompt = (
+            "Given the following messages, select the single one that best exemplifies clarity, helpfulness, and quality. "
+            "Return only the exact message text (no explanation, no extra text):\n\n"
+        )
+        for idx, msg in enumerate(filtered_messages):
+            prompt += f"{idx+1}. {msg}\n"
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a wise evaluator of messages."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.0,
+        )
+        result_message = response.choices[0].message.content.strip()
+        # If result is not in filtered_messages, fall back to first good
+        if result_message in filtered_messages:
+            excellent_msg = result_message
+        else:
+            # Sometimes LLM might return a snippet, attempt fuzzy match
+            for msg in filtered_messages:
+                if result_message in msg or msg in result_message:
+                    excellent_msg = msg
+                    break
+            else:
+                excellent_msg = filtered_messages[0]
+    
+    # Cache the result if question_id is provided
+    if question_id:
+        question_state = get_question_state(question_id)
+        if question_state:
+            question_state.excellent_message = excellent_msg
+            # Auto-save cache to file
+            from app.state import _auto_save_cache
+            _auto_save_cache(question_id)
+    
+    return excellent_msg
     
 
 async def summarize_followup_messages(user_id: str, question_id: str) -> Optional[str]:

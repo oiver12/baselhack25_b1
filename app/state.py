@@ -2,8 +2,11 @@
 In-memory state management for questions and suggestions
 """
 
+import json
+import os
 from datetime import datetime
 from typing import Dict, List, Optional
+from pathlib import Path
 from app.api.schemas import Suggestion, PersonOpinion
 
 
@@ -62,26 +65,84 @@ class QuestionState:
         self.discord_messages: List[DiscordMessage] = []
         self.suggestions: List[Suggestion] = []
         self.participants: Dict[str, Participant] = {}
+        # Cache for message classifications (message_content -> "good"/"neutral"/"bad")
+        self.message_classifications: Dict[str, str] = {}
+        # Cache for excellent message
+        self.excellent_message: Optional[str] = None
 
 
 # Global in-memory storage
 questions: Dict[str, QuestionState] = {}
 
+# Cache directory for persistent storage
+CACHE_DIR = Path("data")
+CACHE_DIR.mkdir(exist_ok=True)
+
+
+def _get_cache_file(question_id: str) -> Path:
+    """Get cache file path for a question"""
+    return CACHE_DIR / f"question_{question_id}.json"
+
+
+def _load_cache(question_id: str, state: QuestionState) -> None:
+    """Load cached classifications and excellent message from file"""
+    cache_file = _get_cache_file(question_id)
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'r') as f:
+                cache_data = json.load(f)
+                state.message_classifications = cache_data.get("classifications", {})
+                state.excellent_message = cache_data.get("excellent_message")
+        except (json.JSONDecodeError, KeyError):
+            pass  # If cache is corrupted, just start fresh
+
+
+def _save_cache(question_id: str, state: QuestionState) -> None:
+    """Save cached classifications and excellent message to file"""
+    cache_file = _get_cache_file(question_id)
+    try:
+        cache_data = {
+            "classifications": state.message_classifications,
+            "excellent_message": state.excellent_message
+        }
+        with open(cache_file, 'w') as f:
+            json.dump(cache_data, f)
+    except Exception:
+        pass  # Silently fail if cache can't be written
+
 
 def get_question_state(question_id: str) -> Optional[QuestionState]:
-    """Get question state by ID"""
-    return questions.get(question_id)
+    """Get question state by ID, loading cache if available"""
+    state = questions.get(question_id)
+    if state:
+        # Load cache if not already loaded
+        if not hasattr(state, '_cache_loaded'):
+            _load_cache(question_id, state)
+            state._cache_loaded = True
+    return state
 
 
 def create_question_state(question_id: str, question: str) -> QuestionState:
-    """Create and store a new question state"""
+    """Create and store a new question state, loading cache if available"""
     state = QuestionState(
         question_id=question_id,
         question=question,
         created_at=datetime.utcnow(),
     )
     questions[question_id] = state
+    
+    # Load existing cache
+    _load_cache(question_id, state)
+    state._cache_loaded = True
+    
     return state
+
+
+def _auto_save_cache(question_id: str) -> None:
+    """Auto-save cache after modifications"""
+    state = questions.get(question_id)
+    if state and hasattr(state, '_cache_loaded'):
+        _save_cache(question_id, state)
 
 
 async def add_message_to_question(question_id: str, message: DiscordMessage) -> None:
