@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Discord Settings
     DISCORD_BOT_TOKEN: str = ""
     DISCORD_GUILD_ID: str = ""
+    DISCORD_CHANNEL_ID: str = ""  # Optional - if set, only use this channel
 
     # AI/ML Settings
     OPENAI_API_KEY: str = ""
