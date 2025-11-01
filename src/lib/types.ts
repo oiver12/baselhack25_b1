@@ -25,3 +25,32 @@ export type Suggestion = {
 };
 
 export type SuggestionsResponse = Suggestion[];
+
+// Report page types
+export type MessagePoint = {
+  id: string;
+  x: number;
+  y: number;
+  message: string;
+  user: string;
+  profilePicUrl: string;
+  cluster?: string;
+  classification?: OpinionClassification;
+};
+
+export type ConsensusSolution = {
+  id: string;
+  title: string;
+  description: string;
+  pros: string[];
+  cons: string[];
+  approvalPercentage: number;
+};
+
+export type ReportData = {
+  question: string;
+  summary: string;
+  opinions: string[];
+  messagePoints: MessagePoint[];
+  solutions: ConsensusSolution[];
+};

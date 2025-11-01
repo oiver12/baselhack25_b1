@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, Copy, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, Share2, Check, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface DashboardHeaderProps {
   questionId: string;
@@ -95,32 +96,49 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
             </div>
           </div>
 
-          {/* Share button */}
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm"
-            style={{
-              backgroundColor: copied 
-                ? "var(--theme-accent-green)" 
-                : "var(--theme-bg-secondary)",
-              color: copied 
-                ? "white" 
-                : "var(--theme-fg-primary)",
-            }}
-            aria-label={copied ? "Copied!" : "Share"}
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Share</span>
-              </>
-            )}
-          </button>
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            {/* View Report button */}
+            <Link
+              href={`/dashboard/${questionId}/report`}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm"
+              style={{
+                backgroundColor: "var(--theme-bg-secondary)",
+                color: "var(--theme-fg-primary)",
+              }}
+              aria-label="View Report"
+            >
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">Report</span>
+            </Link>
+
+            {/* Share button */}
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm"
+              style={{
+                backgroundColor: copied 
+                  ? "var(--theme-accent-green)" 
+                  : "var(--theme-bg-secondary)",
+                color: copied 
+                  ? "white" 
+                  : "var(--theme-fg-primary)",
+              }}
+              aria-label={copied ? "Copied!" : "Share"}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </header>

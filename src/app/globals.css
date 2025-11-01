@@ -285,3 +285,37 @@ html {
 html {
   scroll-behavior: smooth;
 }
+
+/* Override Recharts tooltip animation - fade in without transform */
+.recharts-tooltip-wrapper {
+  animation: fadeInTooltip 0.15s ease-out !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+@keyframes fadeInTooltip {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Print styles for report page */
+@media print {
+  @page {
+    margin: 1cm;
+  }
+  
+  /* Prevent page breaks inside important sections */
+  /* .print:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  } */
+  
+  /* Hide unwanted elements */
+  /* .print\\:hidden {
+    display: none !important;
+  } */
+}
