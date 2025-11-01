@@ -11,6 +11,9 @@ interface ReportPageProps {
   params: Promise<{
     uuid: string;
   }>;
+  searchParams: Promise<{
+    uuid: string;
+  }>;
 }
 
 interface ReportApiResponse {
@@ -38,18 +41,29 @@ interface ReportApiResponse {
   };
 }
 
-export default async function ReportPage({ params }: ReportPageProps) {
+export default async function ReportPage({ params, searchParams }: ReportPageProps) {
   const { uuid } = await params;
-
+  const { uuid: key } = await searchParams;
+ 
   // Fetch report data from backend API
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
   let reportData = mockReportData;
 
   try {
-    const response = await fetch(`${backendUrl}/api/report/${uuid}`, {
+    const response = await fetch(`${backendUrl}/api/report/${uuid}?key=${key}`, {
       cache: "no-store",
     });
-
+    console.log(response);
+    if (response.status === 401) {
+      return (
+        <div className="min-h-screen flex flex-col justify-center items-center bg-white">
+          <h1 className="text-4xl font-bold text-red-600 mb-4">401 Unauthorized</h1>
+          <p className="text-lg text-gray-700 mb-2">
+            You are not authorized to view this report.
+          </p>
+        </div>
+      );
+    }
     if (response.ok) {
       const apiData: ReportApiResponse = await response.json();
       
@@ -82,6 +96,13 @@ export default async function ReportPage({ params }: ReportPageProps) {
     }
   } catch (error) {
     // Silently fall back to mock data on error
+  // INSERT_YOUR_CODE
+  console.error(error);
+
+    
+
+  
+    
   }
 
   // Find the best solution only if it's significantly better and meets minimum threshold

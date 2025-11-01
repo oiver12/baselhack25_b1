@@ -14,6 +14,15 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isNavigatingToReport, setIsNavigatingToReport] = useState(false);
+  const [hasKey, setHasKey] = useState(false);
+
+  // Function to check if "key" is set in localStorage
+  const checkKey = () => {
+    const saved = localStorage.getItem("key");
+    const hasKeyValue = !!saved && saved.trim() !== "";
+    setHasKey(hasKeyValue);
+    return hasKeyValue;
+  };
 
   useEffect(() => {
     async function fetchQuestion() {
@@ -42,6 +51,31 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
     }
   }, [questionId]);
 
+  // Check localStorage on mount and set up listener for changes
+  useEffect(() => {
+    // Initial check
+    checkKey();
+
+    // Listen for storage events (cross-tab updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "key" || e.key === null) {
+        checkKey();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    // Listen for custom event from LockButton when key is updated
+    const handleKeyUpdate = () => {
+      checkKey();
+    };
+    window.addEventListener("key-updated", handleKeyUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("key-updated", handleKeyUpdate);
+    };
+  }, []);
+
   const handleShare = async () => {
     const url = window.location.href;
     try {
@@ -55,7 +89,11 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
 
   const handleReportClick = () => {
     setIsNavigatingToReport(true);
-    router.push(`/dashboard/${questionId}/report`);
+    // Get admin_key from localStorage
+    const key = localStorage.getItem("key");
+    // Add admin_key as query parameter
+    const reportUrl = `/dashboard/${questionId}/report${key ? `?uuid=${encodeURIComponent(key)}` : ''}`;
+    router.push(reportUrl);
   };
 
   return (
@@ -103,29 +141,31 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* View Report button */}
-            <button
-              onClick={handleReportClick}
-              disabled={isNavigatingToReport}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{
-                backgroundColor: "var(--theme-bg-secondary)",
-                color: "var(--theme-fg-primary)",
-              }}
-              aria-label="View Report"
-            >
-              {isNavigatingToReport ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="hidden sm:inline">Loading...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4" />
-                  <span className="hidden sm:inline">Report</span>
-                </>
-              )}
-            </button>
+            {/* View Report button - only show if key is set */}
+            {hasKey && (
+              <button
+                onClick={handleReportClick}
+                disabled={isNavigatingToReport}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  backgroundColor: "var(--theme-bg-secondary)",
+                  color: "var(--theme-fg-primary)",
+                }}
+                aria-label="View Report"
+              >
+                {isNavigatingToReport ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4" />
+                    <span className="hidden sm:inline">Report</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Share button */}
             <button

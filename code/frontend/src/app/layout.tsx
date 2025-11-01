@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/theme-context";
+import LockButton from "./components/LockButton";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +28,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <LockButton />
+        </ThemeProvider>
       </body>
     </html>
   );

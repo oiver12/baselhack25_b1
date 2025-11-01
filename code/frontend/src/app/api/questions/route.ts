@@ -12,9 +12,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Extract key query parameter from request URL
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key");
+
     // Call Python backend API - matches baselhack25_backend/app/api/routes/questions.py
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-    const backendEndpoint = `${backendUrl}/api/questions`;
+    // Forward key query parameter to backend
+    const backendEndpoint = `${backendUrl}/api/questions${key ? `?key=${encodeURIComponent(key)}` : ''}`;
     
     console.log(`Calling Python backend at ${backendEndpoint} with question:`, question.trim());
     

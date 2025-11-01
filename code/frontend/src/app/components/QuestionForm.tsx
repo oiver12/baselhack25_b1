@@ -1,15 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Users } from "lucide-react";
 
 export default function QuestionForm() {
   const [question, setQuestion] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [hasKey, setHasKey] = useState(false);
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [isCheckingActiveQuestion, setIsCheckingActiveQuestion] = useState(true);
   const router = useRouter();
+
+  // Function to check if "key" is set in localStorage
+  const checkKey = () => {
+    const saved = localStorage.getItem("key");
+    const hasKeyValue = !!saved && saved.trim() !== "";
+    setHasKey(hasKeyValue);
+    return hasKeyValue;
+  };
+
+  // Check localStorage on mount and set up listener for changes
+  useEffect(() => {
+    // Initial check
+    checkKey();
+
+    // Listen for storage events (cross-tab updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "key" || e.key === null) {
+        checkKey();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    // Listen for custom event from LockButton when key is updated
+    const handleKeyUpdate = () => {
+      checkKey();
+    };
+    window.addEventListener("key-updated", handleKeyUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("key-updated", handleKeyUpdate);
+    };
+  }, []);
+
+  // Fetch active question on mount
+  useEffect(() => {
+    async function fetchActiveQuestion() {
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        const response = await fetch(`${backendUrl}/api/question_and_ids`);
+        if (response.ok) {
+          const data = await response.json();
+          // Get the first active question (if any)
+          if (Array.isArray(data) && data.length > 0) {
+            setActiveQuestionId(data[0].question_id);
+          } else {
+            setActiveQuestionId(null);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch active question:", error);
+        setActiveQuestionId(null);
+      } finally {
+        setIsCheckingActiveQuestion(false);
+      }
+    }
+
+    fetchActiveQuestion();
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4 py-12">
@@ -106,6 +168,31 @@ export default function QuestionForm() {
               </div>
             </div>
 
+            {!hasKey && (
+              <div
+                className="flex items-start gap-3 px-4 py-3.5 rounded-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-2"
+                style={{
+                  backgroundColor: "rgba(251, 191, 36, 0.08)",
+                  border: "1px solid rgba(251, 191, 36, 0.2)",
+                }}
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <div 
+                    className="w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(251, 191, 36, 0.15)" }}
+                  >
+                    <span className="text-yellow-500 text-xs font-bold">🔒</span>
+                  </div>
+                </div>
+                <p 
+                  className="text-sm font-medium flex-1"
+                  style={{ color: "var(--theme-accent-yellow)" }}
+                >
+                  Please set a key using the lock button at the bottom-right to start a discussion.
+                </p>
+              </div>
+            )}
+
             {error && (
               <div
                 className="flex items-start gap-3 px-4 py-3.5 rounded-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-2"
@@ -131,80 +218,126 @@ export default function QuestionForm() {
               </div>
             )}
 
-            <button
-              type="button"
-              disabled={isLoading || !question.trim()}
-              onClick={async (e) => {
-                e.preventDefault();
-                if (!question.trim()) {
-                  setError("Please enter a question");
-                  return;
-                }
-                setIsLoading(true);
-                setError(null);
-                try {
-                  // Use Next.js API route which proxies to Python backend
-                  const response = await fetch("/api/questions", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ question: question.trim() }),
-                  });
-                  
-                  if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || errorData.detail || `Failed: ${response.statusText}`);
-                  }
-                  
-                  const data = await response.json();
-                  
-                  if (data.question_id) {
-                    // Navigate to dashboard and stop loading
-                    setIsLoading(false);
-                    router.push(`/dashboard/${data.question_id}`);
-                  } else {
-                    throw new Error("No question_id in response");
-                  }
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Failed to create question");
-                  setIsLoading(false);
-                }
-              }}
-              className="group relative w-full py-4 px-8 rounded-xl font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-              style={{
-                background: isLoading || !question.trim()
-                  ? "linear-gradient(to right, #94a3b8, #94a3b8)"
-                  : "linear-gradient(135deg, var(--theme-bubble-primary-from), var(--theme-bubble-primary-to))",
-                boxShadow: isLoading || !question.trim()
-                  ? "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
-                  : "0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.2)",
-              }}
-            >
-              {/* Button shine effect */}
-              {!isLoading && question.trim() && (
-                <div 
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  style={{
-                    background: "linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%)",
-                    backgroundSize: "200% 100%",
-                    animation: "shimmer 3s infinite",
+            <div className="flex gap-4">
+              {activeQuestionId && (
+                <button
+                  type="button"
+                  disabled={isCheckingActiveQuestion || isLoading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(`/dashboard/${activeQuestionId}`);
                   }}
-                />
+                  className="group relative flex-1 py-4 px-8 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden border-2 hover:scale-[1.02]"
+                  style={{
+                    backgroundColor: "var(--theme-bg-secondary)",
+                    borderColor: "var(--theme-bg-tertiary)",
+                    color: "var(--theme-fg-primary)",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                  }}
+                >
+                  <span className="relative flex items-center justify-center gap-3">
+                    {isCheckingActiveQuestion ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--theme-fg-primary)" }} />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-5 h-5 transition-transform group-hover:scale-110" style={{ color: "var(--theme-fg-primary)" }} />
+                        <span>Join Discussion</span>
+                      </>
+                    )}
+                  </span>
+                </button>
               )}
-              
-              <span className="relative flex items-center justify-center gap-3">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Creating Discussion...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Start Discussion</span>
-                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                  </>
+
+              <button
+                type="button"
+                disabled={isLoading || !question.trim() || !hasKey}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  if (!hasKey) {
+                    setError("Please set a key using the lock button to start a discussion");
+                    return;
+                  }
+                  if (!question.trim()) {
+                    setError("Please enter a question");
+                    return;
+                  }
+                  setIsLoading(true);
+                  setError(null);
+                  try {
+                    // Get admin_key from localStorage
+                    const adminKey = localStorage.getItem("key");
+                    
+                    // Use Next.js API route which proxies to Python backend
+                    const response = await fetch(`/api/questions?key=${adminKey}`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ 
+                        question: question.trim(),
+    
+                      }),
+                    });
+                    
+                    if (!response.ok) {
+                      const errorData = await response.json().catch(() => ({}));
+                      throw new Error(errorData.error || errorData.detail || `Failed: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.question_id) {
+                      // Navigate to dashboard and stop loading
+                      setIsLoading(false);
+                      router.push(`/dashboard/${data.question_id}`);
+                    } else {
+                      throw new Error("No question_id in response");
+                    }
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Failed to create question");
+                    setIsLoading(false);
+                  }
+                }}
+                className={`group relative py-4 px-8 rounded-xl font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden ${
+                  activeQuestionId ? "flex-1" : "w-full"
+                }`}
+                style={{
+                  background: isLoading || !question.trim() || !hasKey
+                    ? "linear-gradient(to right, #94a3b8, #94a3b8)"
+                    : "linear-gradient(135deg, var(--theme-bubble-primary-from), var(--theme-bubble-primary-to))",
+                  boxShadow: isLoading || !question.trim() || !hasKey
+                    ? "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                    : "0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.2)",
+                }}
+              >
+                {/* Button shine effect */}
+                {!isLoading && question.trim() && hasKey && (
+                  <div 
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 3s infinite",
+                    }}
+                  />
                 )}
-              </span>
-            </button>
+                
+                <span className="relative flex items-center justify-center gap-3">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Creating Discussion...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Start Discussion</span>
+                      <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                    </>
+                  )}
+                </span>
+              </button>
+            </div>
           </form>
         </div>
 
