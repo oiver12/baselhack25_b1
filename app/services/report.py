@@ -8,8 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from app.state import QuestionState, DiscordMessage
 from app.services.embedding_cache import get_embeddings_batch
-from app.services.summary_service import generate_two_word_summary, generate_bullet_point_summary_with_pros_cons
-
+from app.services.llm_service import generate_bullet_point_summary_with_pros_cons
 
 async def make_2d_plot(question_state: QuestionState) -> List[Dict[str, Any]]:
     """

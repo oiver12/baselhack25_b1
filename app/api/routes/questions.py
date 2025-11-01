@@ -13,7 +13,7 @@ from app.services.discord_service import (
     send_dm_to_introverted_users,
 )
 from app.services.question_service import analyze_historical_messages_for_question
-from app.services.summary_service import process_messages_for_active_question
+from app.services.pipeline import process_all
 
 router = APIRouter()
 
@@ -57,8 +57,8 @@ async def _analyze_historical_messages(question):
         print(f"Starting historical message analysis for question: {question.question}")
         # Filter historical messages and add relevant ones
         await analyze_historical_messages_for_question(question)
-        # Process all messages: generate summaries, classify, find excellent
-        await process_messages_for_active_question()
+        
+        await process_all()
         print(f"Completed historical message analysis for question: {question.question}")
     except Exception as e:
         print(f"Error analyzing historical messages: {e}")
