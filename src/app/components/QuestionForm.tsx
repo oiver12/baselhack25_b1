@@ -143,18 +143,23 @@ export default function QuestionForm() {
                 setIsLoading(true);
                 setError(null);
                 try {
-                  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-                  const response = await fetch(`${backendUrl}/api/questions`, {
+                  // Use Next.js API route which proxies to Python backend
+                  const response = await fetch("/api/questions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ question: question.trim() }),
                   });
+                  
                   if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.error || errorData.detail || `Failed: ${response.statusText}`);
                   }
+                  
                   const data = await response.json();
+                  
                   if (data.question_id) {
+                    // Navigate to dashboard and stop loading
+                    setIsLoading(false);
                     router.push(`/dashboard/${data.question_id}`);
                   } else {
                     throw new Error("No question_id in response");

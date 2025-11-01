@@ -4,14 +4,17 @@ export type Message = {
   profilePicUrl?: string;
 };
 
-export type OpinionClassification = "sophisticated" | "simple" | "neutral";
+export type OpinionClassification = "good" | "neutral" | "bad";
 
 export type SuggestionOpinion = {
   name: string;
   profilePicUrl: string;
-  message: string;
+  message: string; // If followup questions were asked, this is the summary / all the messages
   classification: OpinionClassification;
+  isExcellent: boolean;
 };
+
+export type Suggestions = Suggestion[];
 
 export type Suggestion = {
   title: string;

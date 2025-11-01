@@ -18,7 +18,7 @@ export default function DashboardHeader({ questionId }: DashboardHeaderProps) {
     async function fetchQuestion() {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-        const response = await fetch(`${backendUrl}/api/dashboard/${questionId}`);
+        const response = await fetch(`${backendUrl}/api/questions/${questionId}`);
         if (response.ok) {
           const data = await response.json();
           setQuestionText(data.question || "");

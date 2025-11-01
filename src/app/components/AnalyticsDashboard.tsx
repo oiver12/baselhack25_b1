@@ -8,7 +8,6 @@ import {
   TrendingUp, 
   BarChart3,
   Star,
-  TrendingDown,
   Circle
 } from "lucide-react";
 
@@ -23,11 +22,10 @@ interface AnalyticsData {
   totalParticipants: number;
   totalOpinions: number;
   averageSize: number;
-  totalPros: number;
-  totalCons: number;
+  excellentCount: number;
   classificationBreakdown: {
-    sophisticated: number;
-    simple: number;
+    good: number;
+    bad: number;
     neutral: number;
   };
   sizeDistribution: {
@@ -86,10 +84,12 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
     );
 
     const classificationBreakdown = {
-      sophisticated: allOpinions.filter((o) => o.classification === "sophisticated").length,
-      simple: allOpinions.filter((o) => o.classification === "simple").length,
+      good: allOpinions.filter((o) => o.classification === "good").length,
+      bad: allOpinions.filter((o) => o.classification === "bad").length,
       neutral: allOpinions.filter((o) => o.classification === "neutral").length,
     };
+
+    const excellentCount = allOpinions.filter((o) => o.isExcellent).length;
 
     const sizes = suggestions.map((s) => s.size);
     const averageSize = sizes.length > 0 
@@ -107,8 +107,7 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
       totalParticipants: uniqueParticipants.size,
       totalOpinions: allOpinions.length,
       averageSize,
-      totalPros: suggestions.reduce((sum, s) => sum + s.pros.length, 0),
-      totalCons: suggestions.reduce((sum, s) => sum + s.contra.length, 0),
+      excellentCount,
       classificationBreakdown,
       sizeDistribution,
     };
@@ -265,56 +264,32 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
               </div>
             </div>
 
-            {/* Pros & Cons */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Excellent Messages */}
+            {analytics.excellentCount > 0 && (
               <div 
                 className="p-4 rounded-xl"
                 style={{ backgroundColor: "var(--theme-bg-secondary)" }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <Circle 
-                    className="w-3 h-3 fill-current" 
-                    style={{ color: "var(--theme-accent-green)" }}
+                  <Star 
+                    className="w-4 h-4 fill-current" 
+                    style={{ color: "var(--theme-accent-yellow)" }}
                   />
                   <span 
                     className="text-xs font-medium uppercase tracking-wide"
                     style={{ color: "var(--theme-fg-tertiary)" }}
                   >
-                    Pros
+                    Excellent
                   </span>
                 </div>
                 <div 
                   className="text-xl font-bold"
-                  style={{ color: "var(--theme-accent-green)" }}
+                  style={{ color: "var(--theme-accent-yellow)" }}
                 >
-                  {analytics.totalPros}
+                  {analytics.excellentCount}
                 </div>
               </div>
-
-              <div 
-                className="p-4 rounded-xl"
-                style={{ backgroundColor: "var(--theme-bg-secondary)" }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Circle 
-                    className="w-3 h-3 fill-current" 
-                    style={{ color: "var(--theme-accent-red)" }}
-                  />
-                  <span 
-                    className="text-xs font-medium uppercase tracking-wide"
-                    style={{ color: "var(--theme-fg-tertiary)" }}
-                  >
-                    Cons
-                  </span>
-                </div>
-                <div 
-                  className="text-xl font-bold"
-                  style={{ color: "var(--theme-accent-red)" }}
-                >
-                  {analytics.totalCons}
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Classification Breakdown */}
             <div>
@@ -327,42 +302,42 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Star 
-                      className="w-4 h-4" 
-                      style={{ color: "var(--theme-accent-yellow)" }}
+                    <Circle 
+                      className="w-3 h-3 fill-current" 
+                      style={{ color: "var(--theme-accent-green)" }}
                     />
                     <span 
                       className="text-sm"
                       style={{ color: "var(--theme-fg-primary)" }}
                     >
-                      Sophisticated
+                      Positive
                     </span>
                   </div>
                   <span 
                     className="text-sm font-bold"
                     style={{ color: "var(--theme-fg-primary)" }}
                   >
-                    {analytics.classificationBreakdown.sophisticated}
+                    {analytics.classificationBreakdown.good}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <TrendingDown 
-                      className="w-4 h-4" 
+                    <Circle 
+                      className="w-3 h-3 fill-current" 
                       style={{ color: "var(--theme-accent-red)" }}
                     />
                     <span 
                       className="text-sm"
                       style={{ color: "var(--theme-fg-primary)" }}
                     >
-                      Simple
+                      Negative
                     </span>
                   </div>
                   <span 
                     className="text-sm font-bold"
                     style={{ color: "var(--theme-fg-primary)" }}
                   >
-                    {analytics.classificationBreakdown.simple}
+                    {analytics.classificationBreakdown.bad}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

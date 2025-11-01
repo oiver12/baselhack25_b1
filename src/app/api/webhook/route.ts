@@ -39,11 +39,12 @@ function generateRandomMessage(): Message {
 // POST handler for webhook (for Discord integration later)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     // In the future, this will handle Discord webhook messages
     // For now, just acknowledge receipt
     return NextResponse.json({ received: true, data: body });
-  } catch {
+  } catch (error) {
+    console.error("Webhook POST error:", error);
     return NextResponse.json(
       { error: "Invalid request body" },
       { status: 400 },
@@ -64,14 +65,19 @@ export async function GET(request: NextRequest) {
       });
       controller.enqueue(encoder.encode(`data: ${initialData}\n\n`));
 
-      // Set up interval to send messages every 5 seconds
+      // Set up interval to send messages (500ms for testing, can be adjusted)
       const intervalId = setInterval(() => {
-        const message = generateRandomMessage();
-        const data = JSON.stringify({
-          type: "message",
-          ...message,
-        });
-        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        try {
+          const message = generateRandomMessage();
+          const data = JSON.stringify({
+            type: "message",
+            ...message,
+          });
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        } catch (error) {
+          console.error("Error sending webhook message:", error);
+          // Continue even if one message fails
+        }
       }, 500);
 
       // Clean up on close
@@ -91,7 +97,7 @@ export async function GET(request: NextRequest) {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      Connection: "keep-alive",
+      "Connection": "keep-alive",
     },
   });
 }

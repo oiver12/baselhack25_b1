@@ -24,17 +24,19 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
 
   useEffect(() => {
     // Get backend URL from environment variable or use default
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL + `/ws/${uuid}` || `http://127.0.0.1:8000/ws/${uuid}`;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     
     // Convert HTTP/HTTPS URL to WebSocket URL
-    const wsUrl = backendUrl
+    const wsBaseUrl = backendUrl
       .replace(/^http:/, "ws:")
       .replace(/^https:/, "wss:");
     
-    const ws = new WebSocket(`${wsUrl}/ws/${uuid}`);
+    // Construct WebSocket URL: ws://localhost:8000/ws/{uuid}
+    // Backend route is registered with prefix "/ws" and endpoint "/{question_id}"
+    const ws = new WebSocket(`${wsBaseUrl}/ws/${uuid}`);
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
+      console.log("WebSocket connected successfully");
     };
 
     ws.onmessage = (event) => {
@@ -107,10 +109,14 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
+      console.error("WebSocket URL was:", `${wsBaseUrl}/ws/${uuid}`);
     };
 
     ws.onclose = (event) => {
       console.log("WebSocket closed:", event.code, event.reason);
+      if (event.code !== 1000) {
+        console.warn(`WebSocket closed unexpectedly with code ${event.code}: ${event.reason || "No reason provided"}`);
+      }
     };
 
     return () => {
@@ -175,8 +181,8 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
                 className="group relative overflow-hidden rounded-2xl border backdrop-blur-xl p-5 shadow-2xl transition-all duration-300 w-80 md:w-96"
                 style={{
                   borderColor: "rgba(255, 255, 255, 0.18)",
-                  backgroundColor: "rgba(255, 255, 255, 0.75)",
-                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5)",
+                  backgroundColor: "rgba(17, 24, 39, 0.6)",
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1)",
                 }}
               >
                 {/* Subtle gradient overlay */}

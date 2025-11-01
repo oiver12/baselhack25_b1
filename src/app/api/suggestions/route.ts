@@ -17,7 +17,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -37,13 +38,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -63,13 +66,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -92,13 +97,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -121,13 +128,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -135,6 +144,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -157,13 +167,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -171,6 +183,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -194,13 +207,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -208,6 +223,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -215,7 +231,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -242,13 +259,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -256,6 +275,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -263,7 +283,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -290,13 +311,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -304,6 +327,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -311,7 +335,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -326,7 +351,8 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -353,13 +379,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -367,6 +395,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -374,7 +403,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -389,13 +419,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -422,13 +454,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -436,6 +470,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -443,7 +478,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -458,13 +494,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -491,13 +529,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -505,6 +545,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -512,7 +553,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -530,13 +572,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -563,13 +607,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -577,6 +623,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -584,7 +631,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -602,13 +650,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -624,7 +674,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -651,13 +702,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -665,6 +718,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -672,7 +726,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -690,13 +745,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -712,13 +769,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -745,13 +804,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -759,6 +820,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -766,7 +828,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -784,13 +847,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -806,13 +871,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -839,13 +906,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -853,6 +922,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -860,7 +930,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -878,13 +949,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -900,13 +973,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -933,13 +1008,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -947,6 +1024,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -954,7 +1032,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -972,13 +1051,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -994,13 +1075,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1016,6 +1099,7 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/big-smile/svg?seed=Elena",
           message: "Nice",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -1042,13 +1126,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -1056,6 +1142,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -1063,7 +1150,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -1081,13 +1169,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1103,13 +1193,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1125,6 +1217,7 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/big-smile/svg?seed=Elena",
           message: "Nice",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -1138,7 +1231,8 @@ const stages: SuggestionsResponse[] = [
           name: "Omar",
           profilePicUrl: "https://api.dicebear.com/7.x/shapes/svg?seed=Omar",
           message: "Cool",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1165,13 +1259,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -1179,6 +1275,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -1186,7 +1283,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -1204,13 +1302,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1226,13 +1326,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1248,6 +1350,7 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/big-smile/svg?seed=Elena",
           message: "Nice",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -1261,7 +1364,8 @@ const stages: SuggestionsResponse[] = [
           name: "Omar",
           profilePicUrl: "https://api.dicebear.com/7.x/shapes/svg?seed=Omar",
           message: "Cool",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1276,7 +1380,8 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl:
             "https://api.dicebear.com/7.x/bottts-neutral/svg?seed=Zoe",
           message: "Meh",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1303,13 +1408,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars/svg?seed=Amelia",
           message:
             "Could triage citizen requests automatically and route them to the right department, leveraging existing open data infrastructure.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Jonas",
           profilePicUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Jonas",
           message: "Familiar",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
         {
           name: "Priya",
@@ -1317,6 +1424,7 @@ const stages: SuggestionsResponse[] = [
           message:
             "Needs fallback flows when AI confidence is low — maybe hand off to human agents.",
           classification: "neutral",
+          isExcellent: false,
         },
         {
           name: "Mira",
@@ -1324,7 +1432,8 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Mira",
           message:
             "Could we fine-tune it on past 311 tickets for better accuracy?",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
       ],
     },
@@ -1342,13 +1451,15 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl: "https://api.dicebear.com/7.x/lorelei/svg?seed=Rafael",
           message:
             "Could integrate calendars to prevent overbooking of volunteers.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Yara",
           profilePicUrl: "https://api.dicebear.com/7.x/micah/svg?seed=Yara",
           message: "Love it!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1364,13 +1475,15 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara",
           message:
             "Fits well with the smart-city narrative the city already tells.",
-          classification: "sophisticated",
+          classification: "good",
+          isExcellent: false,
         },
         {
           name: "Ben",
           profilePicUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ben",
           message: "Fun demo!",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1386,6 +1499,7 @@ const stages: SuggestionsResponse[] = [
             "https://api.dicebear.com/7.x/big-smile/svg?seed=Elena",
           message: "Nice",
           classification: "neutral",
+          isExcellent: false,
         },
       ],
     },
@@ -1399,7 +1513,8 @@ const stages: SuggestionsResponse[] = [
           name: "Omar",
           profilePicUrl: "https://api.dicebear.com/7.x/shapes/svg?seed=Omar",
           message: "Cool",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1414,7 +1529,8 @@ const stages: SuggestionsResponse[] = [
           profilePicUrl:
             "https://api.dicebear.com/7.x/bottts-neutral/svg?seed=Zoe",
           message: "Meh",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },
@@ -1428,7 +1544,8 @@ const stages: SuggestionsResponse[] = [
           name: "Max",
           profilePicUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=Max",
           message: "Ok",
-          classification: "simple",
+          classification: "bad",
+          isExcellent: false,
         },
       ],
     },

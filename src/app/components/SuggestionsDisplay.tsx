@@ -6,7 +6,7 @@ import type {
   SuggestionsResponse,
   SuggestionOpinion,
 } from "@/lib/types";
-import { Star, TrendingDown, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Star } from "lucide-react";
 import Image from "next/image";
 import * as d3 from "d3-force";
 import * as d3Drag from "d3-drag";
@@ -25,9 +25,9 @@ interface BubblePosition {
 
 interface ChildBubble {
   id: string;
-  type: "opinion" | "pros" | "cons";
+  type: "opinion";
   angle: number;
-  data?: SuggestionOpinion | string[];
+  data: SuggestionOpinion;
   size: number;
 }
 
@@ -38,11 +38,12 @@ interface SuggestionBubbleData {
   radius: number;
   isHovered: boolean;
   isMoving: boolean; // Track if bubble is currently animated
+  isNew: boolean; // Track if bubble was just added (for fade-in)
 }
 
 interface HoveredBubbleState {
-  type: "opinion" | "pros" | "cons";
-  data: SuggestionOpinion | string[];
+  type: "opinion";
+  data: SuggestionOpinion;
   position: { x: number; y: number };
 }
 
@@ -128,7 +129,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
           setQuestionText("How should we improve the city's public transportation system to better serve all residents?");
         } else {
           const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-          const response = await fetch(`${backendUrl}/api/dashboard/${questionId}`);
+          const response = await fetch(`${backendUrl}/api/questions/${questionId}`);
           if (response.ok) {
             const data = await response.json();
             setQuestionText(data.question || "");
@@ -158,7 +159,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
           setSuggestions(data || []);
         } else {
           // Use real backend
-          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
           
           // Call messages endpoint first (ignore output, just needs to be called)
           await fetch(`${backendUrl}/api/messages`).catch(() => {
@@ -213,10 +214,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
       // Calculate child bubbles with better spacing
       const children: ChildBubble[] = [];
-      const totalChildren =
-        suggestion.peopleOpinions.length +
-        (suggestion.pros.length > 0 ? 1 : 0) +
-        (suggestion.contra.length > 0 ? 1 : 0);
+      const totalChildren = suggestion.peopleOpinions.length;
 
       // Create a consistent random starting angle for this specific suggestion
       // Use a hash of the title to get a deterministic but varied starting angle
@@ -251,41 +249,9 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
         childIndex++;
       });
 
-      // Add pros bubble
-      if (suggestion.pros.length > 0) {
-        const childId = `${suggestion.title}-pros`;
-        const baseAngle = (childIndex / totalChildren) * Math.PI * 2;
-        const spacingOffset = getSpacingOffset(childId, childIndex);
-        children.push({
-          id: childId,
-          type: "pros",
-          angle: baseAngle + baseStartAngle + spacingOffset,
-          data: suggestion.pros,
-          size: 30,
-        });
-        childIndex++;
-      }
-
-      // Add cons bubble
-      if (suggestion.contra.length > 0) {
-        const childId = `${suggestion.title}-cons`;
-        const baseAngle = (childIndex / totalChildren) * Math.PI * 2;
-        const spacingOffset = getSpacingOffset(childId, childIndex);
-        children.push({
-          id: childId,
-          type: "cons",
-          angle: baseAngle + baseStartAngle + spacingOffset,
-          data: suggestion.contra,
-          size: 30,
-        });
-        childIndex++;
-      }
-
       // Determine if this is new data
       const dataHash = JSON.stringify({
         opinions: suggestion.peopleOpinions.length,
-        pros: suggestion.pros.length,
-        cons: suggestion.contra.length,
         size: suggestion.size.toFixed(2),
       });
       const previousHash = previousDataRef.current.get(suggestion.title);
@@ -364,6 +330,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
         radius,
         isHovered: existingBubble?.isHovered || false,
         isMoving: !existingBubble, // New bubbles start as moving
+        isNew: !existingBubble, // Track if this is a new bubble for fade-in
       };
 
       newBubbleData.set(suggestion.title, bubbleData);
@@ -372,6 +339,16 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
     bubbleDataRef.current = newBubbleData;
     setBubbleCount(newBubbleData.size);
     setRenderTrigger((prev) => prev + 1);
+
+    // Mark new bubbles as "no longer new" after fade-in completes
+    setTimeout(() => {
+      bubbleDataRef.current.forEach((bubble) => {
+        if (bubble.isNew) {
+          bubble.isNew = false;
+        }
+      });
+      setRenderTrigger((prev) => prev + 1);
+    }, 600);
   }, [suggestions]);
 
   // Advanced D3-Force physics simulation - PREVENTS ALL OVERLAPS
@@ -1008,7 +985,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
       setHoveredBubble({
         type: child.type,
-        data: child.data as SuggestionOpinion | string[],
+        data: child.data,
         position: {
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
@@ -1204,20 +1181,6 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
             <stop offset="100%" stopColor="var(--theme-bubble-primary-to)" stopOpacity="1" />
           </linearGradient>
           <linearGradient
-            id="gradient-green"
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="var(--theme-bubble-pros-from)" stopOpacity="1" />
-            <stop offset="100%" stopColor="var(--theme-bubble-pros-to)" stopOpacity="1" />
-          </linearGradient>
-          <linearGradient id="gradient-red" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--theme-bubble-cons-from)" stopOpacity="1" />
-            <stop offset="100%" stopColor="var(--theme-bubble-cons-to)" stopOpacity="1" />
-          </linearGradient>
-          <linearGradient
             id="gradient-opinion"
             x1="0%"
             y1="0%"
@@ -1250,13 +1213,19 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
         </defs>
 
         {bubbleData.map((bubble) => {
-          const { suggestion, position, children, radius, isMoving } = bubble;
+          const { suggestion, position, children, radius, isMoving, isNew } = bubble;
           const isParentHovered = hoveredParent === suggestion.title;
           const childDistance = radius + 50;
 
           return (
-            <g key={suggestion.title}>
-              {/* Animated glow ring when moving - fancy effect! */}
+            <g 
+              key={suggestion.title}
+              style={{
+                opacity: isNew ? 0 : 1,
+                animation: isNew ? 'fadeInBubble 0.6s ease-out forwards' : undefined,
+              }}
+            >
+              {/* Animated glow ring when moving - subtle effect */}
               {isMoving && (
                 <>
                   <circle
@@ -1265,20 +1234,21 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                     r={radius + childDistance + 80}
                     fill="none"
                     stroke="var(--theme-bubble-primary-from)"
-                    strokeWidth="3"
-                    opacity="0.2"
+                    strokeWidth="2"
+                    opacity="0.1"
                     className="animate-pulse"
+                    style={{ animationDuration: '3s', animationTimingFunction: 'ease-in-out' }}
                   >
                     <animate
                       attributeName="r"
-                      values={`${radius + childDistance + 60};${radius + childDistance + 90};${radius + childDistance + 60}`}
-                      dur="2s"
+                      values={`${radius + childDistance + 60};${radius + childDistance + 85};${radius + childDistance + 60}`}
+                      dur="3s"
                       repeatCount="indefinite"
                     />
                     <animate
                       attributeName="opacity"
-                      values="0.3;0.1;0.3"
-                      dur="2s"
+                      values="0.15;0.05;0.15"
+                      dur="3s"
                       repeatCount="indefinite"
                     />
                   </circle>
@@ -1288,20 +1258,20 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                     r={radius + 15}
                     fill="none"
                     stroke="var(--theme-glass-white)"
-                    strokeWidth="2"
-                    opacity="0.4"
+                    strokeWidth="1.5"
+                    opacity="0.25"
                     style={{ stroke: "var(--theme-glass-white)" }}
                   >
                     <animate
                       attributeName="r"
-                      values={`${radius + 10};${radius + 20};${radius + 10}`}
-                      dur="1.5s"
+                      values={`${radius + 10};${radius + 18};${radius + 10}`}
+                      dur="2s"
                       repeatCount="indefinite"
                     />
                     <animate
                       attributeName="opacity"
-                      values="0.5;0.2;0.5"
-                      dur="1.5s"
+                      values="0.3;0.15;0.3"
+                      dur="2s"
                       repeatCount="indefinite"
                     />
                   </circle>
@@ -1337,7 +1307,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
               )}
 
               {/* Lines connecting parent to children - stretchy connections */}
-              {children.map((child) => {
+              {children.map((child, i) => {
                 // Calculate actual child position (may be dragged)
                 let childX: number;
                 let childY: number;
@@ -1370,7 +1340,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
                 return (
                   <line
-                    key={child.id}
+                    key={`${child.id}-${i}`}
                     x1={position.x}
                     y1={position.y}
                     x2={childX}
@@ -1421,12 +1391,12 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                   cy={position.y}
                   r={radius}
                   fill="url(#gradient-blue)"
-                  className={`transition-all duration-300 ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${isMoving ? "drop-shadow-2xl" : ""} ${draggedBubbleId === suggestion.title ? "cursor-grabbing" : "cursor-pointer"}`}
-                  filter={isParentHovered || isMoving ? "url(#soft-glow)" : ""}
+                  className={`transition-all duration-300 ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${draggedBubbleId === suggestion.title ? "cursor-grabbing" : "cursor-pointer"}`}
+                  filter={isParentHovered ? "url(#soft-glow)" : ""}
                   style={{
                     transform: isParentHovered ? "scale(1.05)" : "scale(1)",
                     transformOrigin: `${position.x}px ${position.y}px`,
-                    opacity: draggedBubbleId === suggestion.title ? 0.9 : (isMoving ? 0.95 : 1),
+                    opacity: draggedBubbleId === suggestion.title ? 0.9 : 1,
                     pointerEvents: "auto",
                   }}
                   onMouseEnter={() => {
@@ -1505,7 +1475,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
               </g>
 
               {/* Child bubbles - enhanced */}
-              {children.map((child) => {
+              {children.map((child, i) => {
                 // Calculate actual child position (may be dragged)
                 let childX: number;
                 let childY: number;
@@ -1522,13 +1492,11 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                   childY = position.y + Math.sin(child.angle) * childDistance;
                 }
 
-                let gradient = "url(#gradient-opinion)";
-                if (child.type === "pros") gradient = "url(#gradient-green)";
-                if (child.type === "cons") gradient = "url(#gradient-red)";
+                const gradient = "url(#gradient-opinion)";
 
                 return (
                   <g
-                    key={child.id}
+                    key={`${child.id}-${i}`}
                     className="transition-all duration-300"
                     style={{
                       opacity: isParentHovered ? 1 : 0.7,
@@ -1608,73 +1576,51 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                     />
 
                     {/* Profile image for opinions */}
-                    {child.type === "opinion" &&
-                      child.data &&
-                      typeof child.data === "object" &&
-                      "profilePicUrl" in child.data && (
-                        <foreignObject
-                          x={childX - child.size}
-                          y={childY - child.size}
-                          width={child.size * 2}
-                          height={child.size * 2}
-                          className="pointer-events-none"
-                        >
-                          <div className="w-full h-full flex items-center justify-center p-1">
-                            <div className="relative w-full h-full">
-                              <Image
-                                src={child.data.profilePicUrl}
-                                alt={child.data.name}
-                                width={child.size * 2}
-                                height={child.size * 2}
-                                className="rounded-full w-full h-full object-cover ring-2 ring-white/50"
-                                unoptimized
-                              />
-                              {child.data.classification ===
-                                "sophisticated" && (
-                                <div 
-                                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg"
-                                  style={{ backgroundColor: "var(--theme-accent-yellow)" }}
-                                >
-                                  <Star className="w-2.5 h-2.5 text-white fill-white" />
-                                </div>
-                              )}
-                              {child.data.classification === "simple" && (
-                                <div 
-                                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg"
-                                  style={{ backgroundColor: "var(--theme-accent-red)" }}
-                                >
-                                  <TrendingDown className="w-2.5 h-2.5 text-white" />
-                                </div>
-                              )}
-                            </div>
+                    {child.type === "opinion" && (
+                      <foreignObject
+                        x={childX - child.size}
+                        y={childY - child.size}
+                        width={child.size * 2}
+                        height={child.size * 2}
+                        className="pointer-events-none"
+                      >
+                        <div className="w-full h-full flex items-center justify-center p-1">
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={child.data.profilePicUrl}
+                              alt={child.data.name}
+                              width={child.size * 2}
+                              height={child.size * 2}
+                              className="rounded-full w-full h-full object-cover ring-2 ring-white/50"
+                              unoptimized
+                            />
+                            {/* Star for excellent messages - top right */}
+                            {child.data.isExcellent && (
+                              <div 
+                                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg"
+                                style={{ backgroundColor: "var(--theme-accent-yellow)" }}
+                              >
+                                <Star className="w-2.5 h-2.5 text-white fill-white" />
+                              </div>
+                            )}
+                            {/* Plus/Minus indicator - bottom right */}
+                            {child.data.classification === "good" && (
+                              <div 
+                                className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg text-white font-bold text-xs"
+                                style={{ backgroundColor: "var(--theme-accent-green)" }}
+                              >
+                                +
+                              </div>
+                            )}
+                            {child.data.classification === "bad" && (
+                              <div 
+                                className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg text-white font-bold text-xs"
+                                style={{ backgroundColor: "var(--theme-accent-red)" }}
+                              >
+                                −
+                              </div>
+                            )}
                           </div>
-                        </foreignObject>
-                      )}
-
-                    {child.type === "pros" && (
-                      <foreignObject
-                        x={childX - child.size}
-                        y={childY - child.size}
-                        width={child.size * 2}
-                        height={child.size * 2}
-                        className="pointer-events-none"
-                      >
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ThumbsUp className="w-4 h-4 text-white drop-shadow-lg" />
-                        </div>
-                      </foreignObject>
-                    )}
-
-                    {child.type === "cons" && (
-                      <foreignObject
-                        x={childX - child.size}
-                        y={childY - child.size}
-                        width={child.size * 2}
-                        height={child.size * 2}
-                        className="pointer-events-none"
-                      >
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ThumbsDown className="w-4 h-4 text-white drop-shadow-lg" />
                         </div>
                       </foreignObject>
                     )}
@@ -1719,176 +1665,91 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
               }}
             />
             <div className="relative">
-            {hoveredBubble.type === "opinion" &&
-              typeof hoveredBubble.data === "object" &&
-              "name" in hoveredBubble.data && (
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    <div className="relative shrink-0">
-                      <Image
-                        src={hoveredBubble.data.profilePicUrl}
-                        alt={hoveredBubble.data.name}
-                        width={56}
-                        height={56}
-                        className="rounded-xl shadow-lg ring-2 ring-indigo-400/30"
-                        unoptimized
-                      />
+            {hoveredBubble.type === "opinion" && (
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <Image
+                      src={hoveredBubble.data.profilePicUrl}
+                      alt={hoveredBubble.data.name}
+                      width={56}
+                      height={56}
+                      className="rounded-xl shadow-lg ring-2 ring-indigo-400/30"
+                      unoptimized
+                    />
+                    {/* Star for excellent messages */}
+                    {hoveredBubble.data.isExcellent && (
                       <div 
-                        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white"
-                        style={{ backgroundColor: "var(--theme-bg-primary)" }}
+                        className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white"
+                        style={{ backgroundColor: "var(--theme-accent-yellow)" }}
                       >
-                        {hoveredBubble.data.classification ===
-                          "sophisticated" && (
-                          <Star 
-                            className="w-3.5 h-3.5 fill-yellow-400" 
-                            style={{ color: "var(--theme-accent-yellow)" }}
-                          />
-                        )}
-                        {hoveredBubble.data.classification === "simple" && (
-                          <TrendingDown 
-                            className="w-3.5 h-3.5" 
-                            style={{ color: "var(--theme-accent-red)" }}
-                          />
-                        )}
+                        <Star 
+                          className="w-3.5 h-3.5 fill-white text-white" 
+                        />
                       </div>
+                    )}
+                    {/* Plus/Minus indicator */}
+                    {hoveredBubble.data.classification === "good" && (
+                      <div 
+                        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white text-white font-bold text-sm"
+                        style={{ backgroundColor: "var(--theme-accent-green)" }}
+                      >
+                        +
+                      </div>
+                    )}
+                    {hoveredBubble.data.classification === "bad" && (
+                      <div 
+                        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white text-white font-bold text-sm"
+                        style={{ backgroundColor: "var(--theme-accent-red)" }}
+                      >
+                        −
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-1">
+                    <div 
+                      className="font-bold text-base mb-1"
+                      style={{ color: "var(--theme-fg-primary)" }}
+                    >
+                      {hoveredBubble.data.name}
+                      {hoveredBubble.data.isExcellent && (
+                        <span className="ml-2">⭐</span>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0 pt-1">
-                      <div 
-                        className="font-bold text-base mb-1"
-                        style={{ color: "var(--theme-fg-primary)" }}
-                      >
-                        {hoveredBubble.data.name}
-                      </div>
-                      <div 
-                        className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize"
-                        style={{ 
-                          backgroundColor: hoveredBubble.data.classification === "sophisticated" 
-                            ? "rgba(16, 185, 129, 0.1)" 
-                            : "rgba(239, 68, 68, 0.1)",
-                          color: hoveredBubble.data.classification === "sophisticated"
-                            ? "var(--theme-accent-green)"
-                            : "var(--theme-accent-red)",
-                        }}
-                      >
-                        {hoveredBubble.data.classification} opinion
-                      </div>
+                    <div 
+                      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize"
+                      style={{ 
+                        backgroundColor: hoveredBubble.data.classification === "good" 
+                          ? "rgba(16, 185, 129, 0.1)" 
+                          : hoveredBubble.data.classification === "bad"
+                          ? "rgba(239, 68, 68, 0.1)"
+                          : "rgba(100, 100, 100, 0.1)",
+                        color: hoveredBubble.data.classification === "good"
+                          ? "var(--theme-accent-green)"
+                          : hoveredBubble.data.classification === "bad"
+                          ? "var(--theme-accent-red)"
+                          : "var(--theme-fg-tertiary)",
+                      }}
+                    >
+                      {hoveredBubble.data.classification} opinion
                     </div>
                   </div>
-                  <div 
-                    className="relative pl-4 border-l-2"
-                    style={{
-                      borderColor: "var(--theme-bg-tertiary)",
-                    }}
+                </div>
+                <div 
+                  className="relative pl-4 border-l-2"
+                  style={{
+                    borderColor: "var(--theme-bg-tertiary)",
+                  }}
+                >
+                  <p 
+                    className="text-sm leading-relaxed italic"
+                    style={{ color: "var(--theme-fg-secondary)" }}
                   >
-                    <p 
-                      className="text-sm leading-relaxed italic"
-                      style={{ color: "var(--theme-fg-secondary)" }}
-                    >
-                      "{hoveredBubble.data.message}"
-                    </p>
-                  </div>
+                    "{hoveredBubble.data.message}"
+                  </p>
                 </div>
-              )}
-
-            {hoveredBubble.type === "pros" &&
-              Array.isArray(hoveredBubble.data) && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, var(--theme-bubble-pros-from), var(--theme-bubble-pros-to))`,
-                      }}
-                    >
-                      <ThumbsUp className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div 
-                        className="font-bold text-lg"
-                        style={{ color: "var(--theme-accent-green)" }}
-                      >
-                        Advantages
-                      </div>
-                      <div 
-                        className="text-xs opacity-70"
-                        style={{ color: "var(--theme-fg-secondary)" }}
-                      >
-                        {hoveredBubble.data.length} {hoveredBubble.data.length === 1 ? 'point' : 'points'}
-                      </div>
-                    </div>
-                  </div>
-                  <ul className="space-y-2.5">
-                    {hoveredBubble.data.map((pro: string, index: number) => (
-                      <li
-                        key={`pro-${index}-${pro.substring(0, 20)}`}
-                        className="flex items-start gap-3 text-sm"
-                        style={{ color: "var(--theme-fg-secondary)" }}
-                      >
-                        <div 
-                          className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold text-xs"
-                          style={{ 
-                            backgroundColor: "rgba(16, 185, 129, 0.1)",
-                            color: "var(--theme-accent-green)",
-                          }}
-                        >
-                          ✓
-                        </div>
-                        <span className="leading-relaxed">{pro}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-            {hoveredBubble.type === "cons" &&
-              Array.isArray(hoveredBubble.data) && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, var(--theme-bubble-cons-from), var(--theme-bubble-cons-to))`,
-                      }}
-                    >
-                      <ThumbsDown className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div 
-                        className="font-bold text-lg"
-                        style={{ color: "var(--theme-accent-red)" }}
-                      >
-                        Challenges
-                      </div>
-                      <div 
-                        className="text-xs opacity-70"
-                        style={{ color: "var(--theme-fg-secondary)" }}
-                      >
-                        {hoveredBubble.data.length} {hoveredBubble.data.length === 1 ? 'point' : 'points'}
-                      </div>
-                    </div>
-                  </div>
-                  <ul className="space-y-2.5">
-                    {hoveredBubble.data.map((con: string, index: number) => (
-                      <li
-                        key={`con-${index}-${con.substring(0, 20)}`}
-                        className="flex items-start gap-3 text-sm"
-                        style={{ color: "var(--theme-fg-secondary)" }}
-                      >
-                        <div 
-                          className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold text-xs"
-                          style={{ 
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
-                            color: "var(--theme-accent-red)",
-                          }}
-                        >
-                          ✗
-                        </div>
-                        <span className="leading-relaxed">{con}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
         </div>
