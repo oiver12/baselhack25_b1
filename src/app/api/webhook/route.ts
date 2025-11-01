@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           ...message,
         });
         controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-      }, 5000);
+      }, 500);
 
       // Clean up on close
       const cleanup = () => {
