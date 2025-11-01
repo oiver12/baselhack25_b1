@@ -1,2 +1,2 @@
-# API module
+# API package
 

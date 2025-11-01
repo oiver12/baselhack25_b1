@@ -1,91 +1,99 @@
-"""Service for analyzing messages and extracting insights."""
-from typing import List, Tuple
+"""
+Analysis service for message analysis and sentiment
+"""
+from typing import List, Dict
 from app.state import DiscordMessage
 
 
-class AnalysisService:
-    """Service for analyzing Discord messages."""
+async def analyze_sentiment(message: str) -> str:
+    """
+    Analyze sentiment of a message
     
-    async def extract_pros_and_cons(self, messages: List[DiscordMessage]) -> Tuple[List[str], List[str]]:
-        """
-        Extract pros and cons from messages.
+    Args:
+        message: Message text
         
-        Args:
-            messages: List of Discord messages
-        
-        Returns:
-            Tuple of (pros, cons) lists
-        """
-        pros = []
-        cons = []
-        
-        positive_indicators = ["good", "great", "like", "love", "benefit", "advantage", 
-                              "pro", "yes", "support", "agree", "works", "helpful"]
-        negative_indicators = ["bad", "hate", "problem", "issue", "worry", "concern",
-                              "against", "no", "disagree", "doesn't work", "difficult"]
-        
-        for msg in messages:
-            content_lower = msg.content.lower()
-            
-            # Simple extraction based on keywords
-            if any(indicator in content_lower for indicator in positive_indicators):
-                # Extract the positive aspect
-                for sentence in msg.content.split("."):
-                    sentence_lower = sentence.lower()
-                    if any(indicator in sentence_lower for indicator in positive_indicators):
-                        pros.append(sentence.strip())
-            
-            if any(indicator in content_lower for indicator in negative_indicators):
-                for sentence in msg.content.split("."):
-                    sentence_lower = sentence.lower()
-                    if any(indicator in sentence_lower for indicator in negative_indicators):
-                        cons.append(sentence.strip())
-        
-        # Deduplicate and limit
-        pros = list(set(pros))[:10]
-        cons = list(set(cons))[:10]
-        
-        return pros, cons
+    Returns:
+        Sentiment: "positive", "negative", or "neutral"
+    """
+    # TODO: Implement sentiment analysis
+    # - Use OpenAI/Anthropic API or HuggingFace model
+    # - Classify sentiment
     
-    async def cluster_messages_by_theme(self, messages: List[DiscordMessage]) -> List[Tuple[str, List[DiscordMessage]]]:
-        """
-        Cluster messages by theme/topic.
+    return "neutral"
+
+
+async def extract_pros_and_cons(message: str) -> Dict[str, List[str]]:
+    """
+    Extract pros and cons from a message
+    
+    Args:
+        message: Message text
         
-        Args:
-            messages: List of Discord messages
+    Returns:
+        Dictionary with "pros" and "contra" lists
+    """
+    # TODO: Implement pros/cons extraction
+    # - Analyze message for positive points (pros)
+    # - Analyze message for negative points (cons)
+    # - Return structured lists
+    
+    return {
+        "pros": [],
+        "contra": [],
+    }
+
+
+async def extract_themes(messages: List[DiscordMessage]) -> List[str]:
+    """
+    Extract themes/topics from a list of messages
+    
+    Args:
+        messages: List of Discord messages
         
-        Returns:
-            List of (theme_title, messages) tuples
-        """
-        # Simple keyword-based clustering
-        # In production, use NLP/ML for better clustering
+    Returns:
+        List of theme titles
+    """
+    # TODO: Implement theme extraction
+    # - Cluster messages by topic
+    # - Generate theme titles
+    # - Return list of theme strings
+    
+    themes: List[str] = []
+    return themes
+
+
+async def score_relevance(message: str, question: str) -> float:
+    """
+    Score how relevant a message is to a question
+    
+    Args:
+        message: Message text
+        question: Question text
         
-        themes: dict[str, List[DiscordMessage]] = {}
+    Returns:
+        Relevance score between 0 and 1
+    """
+    # TODO: Implement relevance scoring
+    # - Use embeddings or keyword matching
+    # - Score semantic similarity
+    
+    return 0.5
+
+
+async def cluster_messages(messages: List[DiscordMessage]) -> Dict[str, List[DiscordMessage]]:
+    """
+    Cluster messages into groups by topic
+    
+    Args:
+        messages: List of Discord messages
         
-        # Common themes/keywords
-        theme_keywords = {
-            "voting": ["vote", "voting", "poll", "election", "democratic"],
-            "first_come": ["first", "fifo", "queue", "early", "signup"],
-            "lottery": ["lottery", "random", "draw", "chance"],
-            "assigned": ["assign", "allocate", "committee", "manual"],
-            "merit": ["merit", "performance", "grades", "achievement"]
-        }
-        
-        for msg in messages:
-            content_lower = msg.content.lower()
-            matched_theme = None
-            
-            for theme, keywords in theme_keywords.items():
-                if any(keyword in content_lower for keyword in keywords):
-                    matched_theme = theme.replace("_", " ").title()
-                    break
-            
-            if not matched_theme:
-                matched_theme = "Other Suggestions"
-            
-            if matched_theme not in themes:
-                themes[matched_theme] = []
-            themes[matched_theme].append(msg)
-        
-        return [(theme, msgs) for theme, msgs in themes.items() if msgs]
+    Returns:
+        Dictionary mapping theme/topic to list of messages
+    """
+    # TODO: Implement message clustering
+    # - Group similar messages together
+    # - Assign theme/topic labels
+    
+    clusters: Dict[str, List[DiscordMessage]] = {}
+    return clusters
 

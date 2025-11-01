@@ -1,102 +1,133 @@
-"""Service for generating Suggestions from messages."""
+"""
+Service for generating Suggestions from Discord messages
+"""
 from typing import List
-from app.state import QuestionState, DiscordMessage, Participant
+from app.state import DiscordMessage, get_question_state
 from app.api.schemas import Suggestion, PersonOpinion
-from app.services.analysis_service import AnalysisService
-from app.services.summary_service import SummaryService
+from app.services.analysis_service import (
+    extract_themes,
+    extract_pros_and_cons,
+    cluster_messages,
+)
+from app.services.summary_service import (
+    generate_two_word_summary,
+    classify_message,
+    summarize_followup_messages,
+)
 
 
-class SuggestionsService:
-    """Service for generating Suggestions matching the TypeScript type."""
+async def generate_suggestions(question_id: str) -> List[Suggestion]:
+    """
+    Generate Suggestions array from Discord messages
     
-    def __init__(self):
-        self.analysis_service = AnalysisService()
-        self.summary_service = SummaryService()
+    Args:
+        question_id: The question ID
+        
+    Returns:
+        List of Suggestion objects matching TypeScript type
+    """
+    question_state = get_question_state(question_id)
+    if not question_state:
+        return []
     
-    async def generate_suggestions(self, question_state: QuestionState) -> List[Suggestion]:
-        """
-        Generate Suggestions from the question state.
+    messages = question_state.discord_messages
+    
+    # Cluster messages by theme
+    clusters = await cluster_messages(messages)
+    
+    suggestions: List[Suggestion] = []
+    
+    for theme_title, theme_messages in clusters.items():
+        # Aggregate pros and cons for this theme
+        all_pros = []
+        all_contra = []
         
-        Args:
-            question_state: The state containing messages and participants
+        # Collect people opinions
+        people_opinions: List[PersonOpinion] = []
         
-        Returns:
-            List of Suggestion objects matching the TypeScript type
-        """
-        if not question_state.discord_messages:
-            return []
-        
-        # Cluster messages by theme
-        theme_clusters = await self.analysis_service.cluster_messages_by_theme(
-            question_state.discord_messages
-        )
-        
-        suggestions: List[Suggestion] = []
-        total_messages = len(question_state.discord_messages)
-        
-        for theme_title, theme_messages in theme_clusters:
-            # Calculate size (0-1) based on message count
-            size = len(theme_messages) / total_messages if total_messages > 0 else 0
+        for message in theme_messages:
+            # Extract pros/cons from message
+            pros_cons = await extract_pros_and_cons(message.content)
+            all_pros.extend(pros_cons["pros"])
+            all_contra.extend(pros_cons["contra"])
             
-            # Extract pros and cons
-            pros, cons = await self.analysis_service.extract_pros_and_cons(theme_messages)
+            # Create person opinion
+            # Check if there are followup messages from this user
+            followup_summary = await summarize_followup_messages(message.user_id, question_id)
+            message_text = followup_summary if followup_summary else message.content
             
-            # Build people_opinions
-            people_opinions: List[PersonOpinion] = []
+            classification = await classify_message(message.content)
             
-            # Group messages by user
-            user_messages: dict[str, List[DiscordMessage]] = {}
-            for msg in theme_messages:
-                if msg.user_id not in user_messages:
-                    user_messages[msg.user_id] = []
-                user_messages[msg.user_id].append(msg)
-            
-            for user_id, messages in user_messages.items():
-                # Get participant info
-                participant = question_state.participants.get(user_id)
-                if not participant:
-                    # Create participant from first message
-                    first_msg = messages[0]
-                    participant = Participant(
-                        user_id=first_msg.user_id,
-                        username=first_msg.username,
-                        display_name=first_msg.display_name,
-                        profile_pic_url=first_msg.profile_pic_url
-                    )
-                
-                # Combine messages if multiple
-                if len(messages) == 1:
-                    message_text = messages[0].content
-                else:
-                    # Summarize multiple messages
-                    message_text = await self.summary_service.summarize_multiple_messages(
-                        [msg.content for msg in messages]
-                    )
-                
-                # Classify message
-                classification = await self.summary_service.classify_message(message_text)
-                
-                people_opinions.append(
-                    PersonOpinion(
-                        name=participant.display_name,
-                        profile_pic_url=participant.profile_pic_url,
-                        message=message_text,
-                        classification=classification
-                    )
-                )
-            
-            suggestions.append(
-                Suggestion(
-                    title=theme_title,
-                    size=min(size, 1.0),  # Ensure it's 0-1
-                    pros=pros[:5],  # Limit pros
-                    contra=cons[:5],  # Limit cons
-                    people_opinions=people_opinions
+            people_opinions.append(
+                PersonOpinion(
+                    name=message.username,
+                    profile_pic_url=message.profile_pic_url,
+                    message=message_text,
+                    classification=classification,
                 )
             )
         
-        # Sort by size (largest first)
-        suggestions.sort(key=lambda x: x.size, reverse=True)
+        # Calculate size (0-1) based on support/engagement
+        size = await calculate_suggestion_size(theme_messages, messages)
         
-        return suggestions
+        # Create suggestion
+        suggestion = Suggestion(
+            title=theme_title,
+            size=size,
+            pros=list(set(all_pros)),  # Remove duplicates
+            contra=list(set(all_contra)),  # Remove duplicates
+            people_opinions=people_opinions,
+        )
+        
+        suggestions.append(suggestion)
+    
+    return suggestions
+
+
+async def calculate_suggestion_size(
+    theme_messages: List[DiscordMessage],
+    all_messages: List[DiscordMessage],
+) -> float:
+    """
+    Calculate the size (0-1) of a suggestion based on support/engagement
+    
+    Args:
+        theme_messages: Messages for this suggestion
+        all_messages: All messages in the discussion
+        
+    Returns:
+        Size value between 0 and 1
+    """
+    # TODO: Implement size calculation
+    # - Calculate based on message count, engagement, sentiment
+    # - Normalize to 0-1 range
+    
+    if not all_messages:
+        return 0.0
+    
+    return len(theme_messages) / len(all_messages)
+
+
+async def update_suggestions_for_question(question_id: str) -> List[Suggestion]:
+    """
+    Update and store suggestions for a question
+    
+    Args:
+        question_id: The question ID
+        
+    Returns:
+        Updated list of Suggestions
+    """
+    suggestions = await generate_suggestions(question_id)
+    
+    # Update state
+    question_state = get_question_state(question_id)
+    if question_state:
+        question_state.suggestions = suggestions
+    
+    # Broadcast via WebSocket
+    from app.api.routes.websocket import broadcast_suggestions_update
+    await broadcast_suggestions_update(question_id, suggestions)
+    
+    return suggestions
 

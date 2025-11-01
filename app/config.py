@@ -1,35 +1,32 @@
-"""Configuration settings for the application."""
-import os
-from typing import Optional
+"""
+Application configuration
+"""
+from pydantic_settings import BaseSettings
+from typing import List
 
-class Settings:
-    """Application settings loaded from environment variables."""
+
+class Settings(BaseSettings):
+    """Application settings"""
     
     # API Settings
-    API_V1_PREFIX: str = "/api"
-    APP_NAME: str = "Basel Hack 25 Backend"
+    API_TITLE: str = "BaselHack25 Consensus Builder API"
+    API_VERSION: str = "1.0.0"
+    CORS_ORIGINS: List[str] = ["*"]
     
-    # Discord Bot Settings
-    DISCORD_BOT_TOKEN: str = os.getenv("DISCORD_BOT_TOKEN", "")
-    DISCORD_GUILD_ID: Optional[int] = None
+    # Discord Settings
+    DISCORD_BOT_TOKEN: str = ""
+    DISCORD_GUILD_ID: str = ""
     
-    # OpenAI/LLM Settings (for analysis)
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    USE_OPENAI: bool = os.getenv("USE_OPENAI", "false").lower() == "true"
+    # AI/ML Settings
+    OPENAI_API_KEY: str = ""
     
-    # Server Settings
-    HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "8000"))
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    # Application Settings
+    DASHBOARD_BASE_URL: str = "https://yourapp.com/dashboard"
     
-    # Dashboard URL (for generating dashboard links)
-    DASHBOARD_BASE_URL: str = os.getenv("DASHBOARD_BASE_URL", "http://localhost:3000/dashboard")
-    
-    @classmethod
-    def validate(cls) -> None:
-        """Validate required settings."""
-        if not cls.DISCORD_BOT_TOKEN:
-            raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
 
 settings = Settings()
 

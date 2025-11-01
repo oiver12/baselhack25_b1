@@ -1,87 +1,94 @@
-"""WebSocket routes for live updates."""
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.state import state_manager
+"""
+WebSocket endpoint for live updates
+"""
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from typing import Dict, Set
 import json
+from app.state import get_question_state
+from app.api.schemas import Suggestion
 
-router = APIRouter(tags=["websocket"])
+router = APIRouter()
 
 
 class ConnectionManager:
-    """Manages WebSocket connections."""
+    """Manages WebSocket connections"""
     
     def __init__(self):
-        self.active_connections: dict[str, list[WebSocket]] = {}
+        self.active_connections: Dict[str, Set[WebSocket]] = {}
     
     async def connect(self, websocket: WebSocket, question_id: str):
-        """Connect a WebSocket for a question."""
+        """Connect a client to a question's WebSocket"""
         await websocket.accept()
         if question_id not in self.active_connections:
-            self.active_connections[question_id] = []
-        self.active_connections[question_id].append(websocket)
+            self.active_connections[question_id] = set()
+        self.active_connections[question_id].add(websocket)
     
     def disconnect(self, websocket: WebSocket, question_id: str):
-        """Disconnect a WebSocket."""
+        """Disconnect a client from a question's WebSocket"""
         if question_id in self.active_connections:
-            self.active_connections[question_id].remove(websocket)
+            self.active_connections[question_id].discard(websocket)
     
-    async def broadcast(self, question_id: str, data: dict):
-        """Broadcast data to all connections for a question."""
+    async def broadcast_to_question(self, question_id: str, data: dict):
+        """Broadcast data to all clients connected to a question"""
         if question_id in self.active_connections:
-            disconnected = []
+            disconnected = set()
             for connection in self.active_connections[question_id]:
                 try:
                     await connection.send_json(data)
-                except Exception as e:
-                    print(f"Error sending WebSocket message: {e}")
-                    disconnected.append(connection)
-            
-            # Remove disconnected connections
+                except:
+                    disconnected.add(connection)
+            # Remove disconnected clients
             for conn in disconnected:
-                self.active_connections[question_id].remove(conn)
+                self.active_connections[question_id].discard(conn)
 
 
-connection_manager = ConnectionManager()
+manager = ConnectionManager()
 
 
-@router.websocket("/ws/{question_id}")
+@router.websocket("/{question_id}")
 async def websocket_endpoint(websocket: WebSocket, question_id: str):
-    """WebSocket endpoint for live updates."""
-    await connection_manager.connect(websocket, question_id)
+    """
+    WebSocket endpoint for live updates
+    
+    WS /ws/{question_id}
+    Streams: new Suggestions updates as they're generated
+    """
+    # Verify question exists
+    question_state = get_question_state(question_id)
+    if not question_state:
+        await websocket.close(code=1008, reason="Question not found")
+        return
+    
+    # Connect client
+    await manager.connect(websocket, question_id)
     
     try:
-        # Send initial data
-        question_state = state_manager.get_question(question_id)
-        if question_state:
-            await websocket.send_json({
-                "type": "initial",
-                "suggestions": [s.model_dump() for s in question_state.suggestions],
-                "bubbles": question_state.live_bubbles
-            })
+        # Send initial state
+        initial_data = {
+            "type": "initial",
+            "suggestions": [s.model_dump() for s in question_state.suggestions],
+        }
+        await websocket.send_json(initial_data)
         
-        # Keep connection alive and listen for messages
+        # Keep connection alive and wait for messages
         while True:
             data = await websocket.receive_text()
-            # Echo back or handle client messages if needed
-            await websocket.send_json({"type": "ack", "message": "Received"})
+            # Handle client messages if needed
+            # For now, just keep connection alive
+            pass
             
     except WebSocketDisconnect:
-        connection_manager.disconnect(websocket, question_id)
+        manager.disconnect(websocket, question_id)
+    except Exception as e:
+        manager.disconnect(websocket, question_id)
+        raise
 
 
-async def broadcast_suggestion_update(question_id: str):
-    """Broadcast suggestion updates to all connected clients."""
-    question_state = state_manager.get_question(question_id)
-    if question_state:
-        await connection_manager.broadcast(question_id, {
-            "type": "suggestions_updated",
-            "suggestions": [s.model_dump() for s in question_state.suggestions]
-        })
-
-
-async def broadcast_bubble_update(question_id: str, bubble: dict):
-    """Broadcast a new bubble to all connected clients."""
-    await connection_manager.broadcast(question_id, {
-        "type": "new_bubble",
-        "bubble": bubble
-    })
+async def broadcast_suggestions_update(question_id: str, suggestions: list[Suggestion]):
+    """Broadcast updated suggestions to all connected clients"""
+    data = {
+        "type": "suggestions_update",
+        "suggestions": [s.model_dump() for s in suggestions],
+    }
+    await manager.broadcast_to_question(question_id, data)
 
