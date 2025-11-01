@@ -22,7 +22,14 @@ async def extract_asked_questions(messages: List[DiscordMessage]) -> List[str]:
             asked_questions.add(message.content)
     return list(asked_questions)
 
-async def assign_messages_to_existing_questions(messages: List[DiscordMessage], allow_new_questions: bool = True) -> List[str]:
+async def assign_one_message_to_existing_questions(message: DiscordMessage, allow_new_questions: bool = True) -> str:
+    """
+    Assign a single message to an existing question using clustering.
+    """
+    return await assign_messages_to_existing_questions([message], allow_new_questions)
+
+
+async def assign_messages_to_existing_questions(messages: [DiscordMessage], allow_new_questions: bool = True) -> List[str]:
     """
     Assign messages to existing questions using clustering.
     First tries to assign to questions extracted from !start_discussion commands,
