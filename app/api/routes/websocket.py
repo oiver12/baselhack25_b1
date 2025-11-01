@@ -18,6 +18,7 @@ class ConnectionManager:
 
     def __init__(self):
         self.active_connections: Dict[str, Set[WebSocket]] = {}
+        self.all_messages_connections: Set[WebSocket] = set()  # For global all-messages endpoint
 
     def _is_allowed_origin(self, origin: Optional[str]) -> bool:
         """Check if origin is allowed"""
@@ -67,6 +68,18 @@ class ConnectionManager:
             # Remove disconnected clients
             for conn in disconnected:
                 self.active_connections[question_id].discard(conn)
+    
+    async def broadcast_to_all_messages(self, data: dict):
+        """Broadcast data to all clients connected to the all-messages endpoint"""
+        disconnected = set()
+        for connection in self.all_messages_connections:
+            try:
+                await connection.send_json(data)
+            except:
+                disconnected.add(connection)
+        # Remove disconnected clients
+        for conn in disconnected:
+            self.all_messages_connections.discard(conn)
 
 
 manager = ConnectionManager()
@@ -145,13 +158,99 @@ async def broadcast_suggestions_update(question_id: str, suggestions: list[Sugge
 
 
 async def broadcast_discord_message(
-    question_id: str, username: str, message: str, profile_pic_url: str
+    question_id: str, 
+    username: str, 
+    message: str, 
+    profile_pic_url: str,
+    message_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    timestamp: Optional[str] = None,
+    channel_id: Optional[str] = None
 ):
     """Broadcast a Discord message to all connected clients"""
-    data = {
+    # Basic message format (for backward compatibility)
+    basic_data = {
         "type": "message",
         "user": username,
         "message": message,
         "profilePicUrl": profile_pic_url,
     }
-    await manager.broadcast_to_question(question_id, data)
+    await manager.broadcast_to_question(question_id, basic_data)
+    
+    # Enhanced message format (for messages endpoint with full details)
+    if message_id and user_id:
+        enhanced_data = {
+            "type": "message",
+            "messageId": message_id,
+            "userId": user_id,
+            "user": username,
+            "message": message,
+            "profilePicUrl": profile_pic_url,
+            "timestamp": timestamp or "",
+            "channelId": channel_id or "",
+        }
+        await manager.broadcast_to_question(question_id, enhanced_data)
+
+
+@router.websocket("/messages/{question_id}")
+async def messages_websocket_endpoint(websocket: WebSocket, question_id: str):
+    """
+    WebSocket endpoint specifically for receiving only NEW Discord messages
+    
+    WS /ws/messages/{question_id}
+    
+    Streams only NEW Discord messages in real-time (no historical messages).
+    Only messages that arrive after connection will be sent.
+    
+    Message format:
+    {
+        "type": "message",
+        "messageId": "string",
+        "userId": "string",
+        "user": "string",
+        "message": "string",
+        "profilePicUrl": "string",
+        "timestamp": "ISO8601 string",
+        "channelId": "string"
+    }
+    """
+    # Connect client (validates origin and accepts connection)
+    connected = await manager.connect(websocket, question_id)
+    if not connected:
+        return  # Connection was rejected due to origin validation
+    
+    # Verify question exists
+    question_state = get_question_state(question_id)
+    if not question_state:
+        await websocket.close(code=1008, reason="Question not found")
+        manager.disconnect(websocket, question_id)
+        return
+    
+    try:
+        # Send connected message
+        await websocket.send_json({
+            "type": "connected",
+            "message": "Connected to Discord messages stream - waiting for new messages",
+            "questionId": question_id
+        })
+        
+        # Don't send historical messages - only wait for new ones
+        # New messages will be broadcast automatically via broadcast_discord_message()
+        # which uses the same connection manager
+        while True:
+            # Listen for any client messages (ping/pong, etc.)
+            try:
+                data = await websocket.receive_text()
+                # Echo back or handle client messages if needed
+                await websocket.send_json({
+                    "type": "pong",
+                    "message": "Connection alive"
+                })
+            except WebSocketDisconnect:
+                break
+    
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, question_id)
+    except Exception as e:
+        manager.disconnect(websocket, question_id)
+        raise

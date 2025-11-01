@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from app.api.schemas import QuestionRequest, QuestionResponse
 from app.config import settings
-from app.state import create_question_state
+from app.state import create_question_state, global_historical_messages
 from app.services.discord_service import (
     scrape_discord_history,
     send_dm_to_introverted_users,
@@ -31,10 +31,16 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     # Create question state
     question_state = create_question_state(question_id, request.question)
 
-    # Scrape Discord history for relevant messages
-    messages = await scrape_discord_history(request.question)
-
-    # Add messages to state
+    # Use historical messages from global storage (fetched on startup)
+    # If global storage is empty (e.g., bot just started), fetch now
+    if not global_historical_messages:
+        print("Global historical messages empty, fetching now...")
+        messages = await scrape_discord_history()
+        global_historical_messages.extend(messages)
+    else:
+        messages = global_historical_messages.copy()
+    
+    # Add messages to question state
     for message in messages:
         question_state.discord_messages.append(message)
 

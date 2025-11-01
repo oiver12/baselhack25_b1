@@ -54,7 +54,7 @@ DUMMY_MESSAGES = [
     "Let's use Jira or Asana for task management",
     "lionels cock is too small",
     "Lionel has a very big cock",
-    "I want to suck linoels big hairy cock"
+    "I want to suck lionels big hairy cock"
 
 
 ]
