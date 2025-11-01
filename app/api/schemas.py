@@ -1,10 +1,12 @@
-"""Pydantic schemas matching TypeScript types."""
+"""
+Pydantic schemas matching TypeScript types
+"""
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, List
 
 
 class PersonOpinion(BaseModel):
-    """Represents a person's opinion on a suggestion."""
+    """Matches TypeScript PersonOpinion type"""
     name: str
     profile_pic_url: str
     message: str  # If followup questions were asked, this is the summary / all the messages
@@ -12,32 +14,25 @@ class PersonOpinion(BaseModel):
 
 
 class Suggestion(BaseModel):
-    """Represents a suggestion/option for the question."""
+    """Matches TypeScript Suggestion type"""
     title: str
     size: float  # 0 - 1
-    pros: list[str]
-    contra: list[str]
-    people_opinions: list[PersonOpinion]
+    pros: List[str]
+    contra: List[str]
+    people_opinions: List[PersonOpinion]
 
 
-# Response type (array of Suggestions)
-SuggestionsResponse = list[Suggestion]
+# Response type: array of Suggestions
+SuggestionsResponse = List[Suggestion]
 
 
 class QuestionRequest(BaseModel):
-    """Request body for creating a new question."""
+    """Request body for creating a question"""
     question: str
 
 
 class QuestionResponse(BaseModel):
-    """Response for creating a new question."""
+    """Response when creating a question"""
     question_id: str
     dashboard_url: str
-
-
-class BubbleData(BaseModel):
-    """Represents a live bubble (2-word summary)."""
-    summary: str
-    username: str
-    timestamp: str
 

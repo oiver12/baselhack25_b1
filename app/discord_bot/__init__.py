@@ -1,2 +1,2 @@
-# Discord bot module
+# Discord bot package
 

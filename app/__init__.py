@@ -1,2 +1,2 @@
-# Basel Hack 25 Backend - Collective Intelligence Discord Bot
+# BaselHack25 Backend Application
 

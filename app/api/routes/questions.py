@@ -1,54 +1,46 @@
-"""API routes for question management."""
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+"""
+Question creation endpoint
+"""
+from fastapi import APIRouter, HTTPException
+from uuid import uuid4
 from app.api.schemas import QuestionRequest, QuestionResponse
 from app.config import settings
-from app.state import state_manager
-from app.services.discord_service import DiscordService
+from app.state import create_question_state
+from app.services.discord_service import scrape_discord_history, send_dm_to_introverted_users
 
-router = APIRouter(prefix="/api/questions", tags=["questions"])
+router = APIRouter()
 
 
-@router.post("", response_model=QuestionResponse, status_code=201)
-async def create_question(
-    request: QuestionRequest,
-    background_tasks: BackgroundTasks
-) -> QuestionResponse:
-    """Create a new question/discussion session."""
-    # Create question in state
-    question_id = state_manager.create_question(request.question)
+@router.post("/questions", response_model=QuestionResponse)
+async def create_question(request: QuestionRequest) -> QuestionResponse:
+    """
+    Create a new discussion question
     
-    # Start background task to scrape Discord history
-    background_tasks.add_task(
-        scrape_discord_history,
-        question_id=question_id,
-        question=request.question
-    )
+    POST /api/questions
+    Body: {"question": "How should we change..."}
+    Response: {"question_id": "uuid", "dashboard_url": "..."}
+    """
+    # Generate unique question ID
+    question_id = str(uuid4())
     
+    # Create question state
+    question_state = create_question_state(question_id, request.question)
+    
+    # Scrape Discord history for relevant messages
+    messages = await scrape_discord_history(request.question)
+    
+    # Add messages to state
+    for message in messages:
+        question_state.discord_messages.append(message)
+    
+    # Send DMs to introverted users
+    await send_dm_to_introverted_users(question_id, request.question)
+    
+    # Construct dashboard URL
     dashboard_url = f"{settings.DASHBOARD_BASE_URL}/{question_id}"
     
     return QuestionResponse(
         question_id=question_id,
-        dashboard_url=dashboard_url
+        dashboard_url=dashboard_url,
     )
-
-
-async def scrape_discord_history(question_id: str, question: str) -> None:
-    """Background task to scrape Discord chat history for the question."""
-    try:
-        discord_service = DiscordService()
-        messages = await discord_service.scrape_relevant_messages(question)
-        
-        # Add messages to state
-        question_state = state_manager.get_question(question_id)
-        if question_state:
-            for msg in messages:
-                question_state.add_message(msg)
-            
-            # Trigger analysis to generate suggestions
-            from app.services.suggestions_service import SuggestionsService
-            suggestions_service = SuggestionsService()
-            suggestions = await suggestions_service.generate_suggestions(question_state)
-            state_manager.update_suggestions(question_id, suggestions)
-    except Exception as e:
-        print(f"Error scraping Discord history: {e}")
 
