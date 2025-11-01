@@ -2,7 +2,7 @@
 Service for generating summaries and classifications
 """
 from typing import Optional, List
-from app.state import get_question_state, DiscordMessage
+from app.state import get_question_state, get_active_question, DiscordMessage
 from app.config import settings
 from openai import OpenAI
 import numpy as np
@@ -230,10 +230,15 @@ async def classify_message(message: [str], question_id: Optional[str] = None) ->
     uncached_messages = []
     uncached_indices = []
     
+    # Use active_question if question_id is provided, or if no question_id provided, try active_question
+    question_state = None
     if question_id:
         question_state = get_question_state(question_id)
-        if question_state and question_state.message_classifications:
-            cached_classifications = question_state.message_classifications.copy()  # Use copy to avoid modifying original
+    else:
+        question_state = get_active_question()
+    
+    if question_state and question_state.message_classifications:
+        cached_classifications = question_state.message_classifications.copy()  # Use copy to avoid modifying original
     
     # Separate cached and uncached messages
     for idx, msg in enumerate(message):
@@ -260,11 +265,9 @@ async def classify_message(message: [str], question_id: Optional[str] = None) ->
             if label not in {"good", "neutral", "bad"}:
                 label = "neutral"
             
-            # Cache the result if question_id is provided
-            if question_id:
-                question_state = get_question_state(question_id)
-                if question_state:
-                    question_state.message_classifications[msg] = label
+            # Cache the result if we have a question_state
+            if question_state:
+                question_state.message_classifications[msg] = label
             cached_classifications[msg] = label
     
     # Save once after all classifications (if any were made)
@@ -292,13 +295,17 @@ async def find_excellent_message(messages: [str], class_labels: [str], question_
     Returns:
         Excellent message
     """
-    # Check cache first if question_id is provided
+    # Check cache first - use active_question if question_id provided, or try active_question
+    question_state = None
     if question_id:
         question_state = get_question_state(question_id)
-        if question_state and question_state.excellent_message:
-            # Verify the cached excellent message is still in the current messages
-            if question_state.excellent_message in messages:
-                return question_state.excellent_message
+    else:
+        question_state = get_active_question()
+    
+    if question_state and question_state.excellent_message:
+        # Verify the cached excellent message is still in the current messages
+        if question_state.excellent_message in messages:
+            return question_state.excellent_message
     
     # Filter out messages with class label 'bad'
     filtered_messages = [msg for msg, label in zip(messages, class_labels) if label == "good"]
@@ -340,30 +347,23 @@ async def find_excellent_message(messages: [str], class_labels: [str], question_
             else:
                 excellent_msg = filtered_messages[0]
     
-    # Cache the result if question_id is provided
-    if question_id:
-        question_state = get_question_state(question_id)
-        if question_state:
-            question_state.excellent_message = excellent_msg
-            # Auto-save cache to file
-            from app.state import save_all_questions
-            save_all_questions()
+    # Cache the result if we have a question_state
+    if question_state:
+        question_state.excellent_message = excellent_msg
+        # Auto-save cache to file
+        from app.state import save_all_questions
+        save_all_questions()
     
     return excellent_msg
     
 
-async def process_messages_for_question(question_id: str) -> None:
+async def process_messages_for_active_question() -> None:
     """
-    Process all messages for a question: generate summaries, classify, and identify excellent message.
+    Process all messages for the active question: generate summaries, classify, and identify excellent message.
     Updates each message with its summary, classification, and excellence status.
     Updates question state's two_word_summaries list.
-    
-    Args:
-        question_id: The question ID to process
     """
-    from app.state import get_question_state
-    
-    question_state = get_question_state(question_id)
+    question_state = get_active_question()
     if not question_state or not question_state.discord_messages:
         return
     
@@ -403,7 +403,7 @@ async def process_messages_for_question(question_id: str) -> None:
         single_summaries = await generate_two_word_summary(
             [msg_content],
             existing_groups=existing_groups if existing_groups else None,
-            question_id=question_id
+            question_id=question_state.question_id if question_state else None
         )
         if single_summaries:
             message_summaries.append(single_summaries[0])
@@ -423,10 +423,10 @@ async def process_messages_for_question(question_id: str) -> None:
             message_summaries.append(" ".join(words))
     
     # Classify all messages
-    classifications = await classify_message(messages, question_id=question_id)
+    classifications = await classify_message(messages, question_id=question_state.question_id if question_state else None)
     
     # Find excellent message
-    excellent_message = await find_excellent_message(messages, classifications, question_id=question_id)
+    excellent_message = await find_excellent_message(messages, classifications, question_id=question_state.question_id if question_state else None)
     
     # Update each message object
     for i, msg in enumerate(question_state.discord_messages):
@@ -442,18 +442,15 @@ async def process_messages_for_question(question_id: str) -> None:
     save_all_questions()
 
 
-async def process_single_message_for_question(question_id: str, message: DiscordMessage) -> None:
+async def process_single_message_for_active_question(message: DiscordMessage) -> None:
     """
-    Process a single new message for a question: generate summary, classify, and update state.
+    Process a single new message for the active question: generate summary, classify, and update state.
     Only processes this one message and checks against existing summaries - doesn't recalculate all messages.
     
     Args:
-        question_id: The question ID
         message: The DiscordMessage object to process
     """
-    from app.state import get_question_state
-    
-    question_state = get_question_state(question_id)
+    question_state = get_active_question()
     if not question_state:
         return
     
@@ -478,7 +475,7 @@ async def process_single_message_for_question(question_id: str, message: Discord
     two_word_summaries = await generate_two_word_summary(
         [message.content],
         existing_groups=existing_groups if existing_groups else None,
-        question_id=question_id
+        question_id=question_state.question_id if question_state else None
     )
     
     if two_word_summaries:
@@ -507,7 +504,7 @@ async def process_single_message_for_question(question_id: str, message: Discord
             question_state.two_word_summaries.sort()
     
     # Classify only this message
-    classifications = await classify_message([message.content], question_id=question_id)
+    classifications = await classify_message([message.content], question_id=question_state.question_id if question_state else None)
     if classifications:
         message.classification = classifications[0]
     else:
@@ -522,7 +519,7 @@ async def process_single_message_for_question(question_id: str, message: Discord
         else:
             all_classifications.append("neutral")
     
-    excellent_message = await find_excellent_message(all_message_contents, all_classifications, question_id=question_id)
+    excellent_message = await find_excellent_message(all_message_contents, all_classifications, question_id=question_state.question_id if question_state else None)
     
     # Reset is_excellent for all messages, then set it for the excellent one
     for msg in question_state.discord_messages:
@@ -533,13 +530,13 @@ async def process_single_message_for_question(question_id: str, message: Discord
     save_all_questions()
 
 
-async def summarize_followup_messages(user_id: str, question_id: str) -> Optional[str]:
+async def summarize_followup_messages(user_id: str, question_id: Optional[str] = None) -> Optional[str]:
     """
-    Summarize all followup messages from a user for a question
+    Summarize all followup messages from a user for the active question
     
     Args:
         user_id: Discord user ID
-        question_id: Question ID
+        question_id: Optional question ID (legacy, will use active_question if not provided)
         
     Returns:
         Summary of all messages, or None if no followup messages
@@ -549,7 +546,12 @@ async def summarize_followup_messages(user_id: str, question_id: str) -> Optiona
     # - If multiple messages, summarize them
     # - Return summary or None if single message
     
-    question_state = get_question_state(question_id)
+    question_state = None
+    if question_id:
+        question_state = get_question_state(question_id)
+    else:
+        question_state = get_active_question()
+    
     if not question_state:
         return None
     

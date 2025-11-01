@@ -2,7 +2,7 @@
 Dashboard data endpoint
 """
 from fastapi import APIRouter, HTTPException
-from app.state import get_question_state
+from app.state import get_active_question
 
 router = APIRouter()
 
@@ -10,14 +10,19 @@ router = APIRouter()
 @router.get("/dashboard/{question_id}")
 async def get_dashboard_data(question_id: str):
     """
-    Get dashboard data for a question
+    Get dashboard data for the active question
     
     GET /api/dashboard/{question_id}
     Response: Question state with messages and participants
+    Verifies question_id matches active question for backward compatibility
     """
-    question_state = get_question_state(question_id)
+    question_state = get_active_question()
     
     if not question_state:
+        raise HTTPException(status_code=404, detail="No active question")
+    
+    # Verify question_id matches active question (backward compatibility)
+    if question_state.question_id != question_id:
         raise HTTPException(status_code=404, detail="Question not found")
     
     # Return question state

@@ -116,32 +116,6 @@ async def startup_event():
                 if new_messages:
                     print(f"\nFetched {len(new_messages)} new messages")
                     
-                    # Assign new messages to questions
-                    from app.services.question_service import assign_messages_to_existing_questions
-                    question_ids = await assign_messages_to_existing_questions(new_messages)
-                    print(f"Assigned {len(new_messages)} messages to {len(question_ids)} questions")
-                    
-                    # Process all messages for each question: generate summaries, classify, find excellent
-                    from app.services.summary_service import process_messages_for_question
-                    for qid in question_ids:
-                        try:
-                            await process_messages_for_question(qid)
-                            print(f"Processed messages for question {qid}")
-                        except Exception as e:
-                            print(f"Warning: Failed to process messages for question {qid}: {e}")
-                    
-                    # Update question_id field on messages based on assignment
-                    from app.state import questions as questions_dict
-                    message_to_question = {}
-                    for qid, qstate in questions_dict.items():
-                        for msg in qstate.discord_messages:
-                            message_to_question[msg.message_id] = qid
-                    
-                    # Update question_id on all messages
-                    for msg in new_messages:
-                        if msg.message_id in message_to_question:
-                            msg.question_id = message_to_question[msg.message_id]
-                    
                     # Merge with existing cache
                     from app.state import (
                         global_historical_messages, 

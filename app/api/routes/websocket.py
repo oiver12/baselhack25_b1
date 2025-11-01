@@ -6,7 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from typing import Dict, Set, Optional
 import json
 import asyncio
-from app.state import get_question_state
+from app.state import get_active_question
 from app.config import settings
 
 router = APIRouter()
@@ -100,9 +100,9 @@ async def websocket_endpoint(websocket: WebSocket, question_id: str):
     if not connected:
         return  # Connection was rejected due to origin validation
 
-    # Verify question exists after connection is accepted
-    question_state = get_question_state(question_id)
-    if not question_state:
+    # Verify question_id matches active question
+    question_state = get_active_question()
+    if not question_state or question_state.question_id != question_id:
         await websocket.close(code=1008, reason="Question not found")
         manager.disconnect(websocket, question_id)
         return
@@ -219,9 +219,9 @@ async def messages_websocket_endpoint(websocket: WebSocket, question_id: str):
     if not connected:
         return  # Connection was rejected due to origin validation
     
-    # Verify question exists
-    question_state = get_question_state(question_id)
-    if not question_state:
+    # Verify question_id matches active question
+    question_state = get_active_question()
+    if not question_state or question_state.question_id != question_id:
         await websocket.close(code=1008, reason="Question not found")
         manager.disconnect(websocket, question_id)
         return
