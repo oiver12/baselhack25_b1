@@ -700,6 +700,7 @@ export default function SuggestionsDisplay() {
                       className="text-center text-white font-bold leading-snug break-words drop-shadow-md"
                       style={{
                         fontSize: `${Math.max(12, Math.min(24, radius * 0.25 - suggestion.title.length * 0.15))}px`,
+                        maxHeight: `${radius * 1.4}px`,
                       }}
                     >
                       {suggestion.title}
@@ -707,11 +708,11 @@ export default function SuggestionsDisplay() {
                   </div>
                 </foreignObject>
 
-                {/* Size indicator - small badge */}
+                {/* Size indicator - small badge positioned outside bubble */}
                 <g>
                   <circle
                     cx={position.x}
-                    cy={position.y + radius - 25}
+                    cy={position.y + radius + 15}
                     r={18}
                     fill="white"
                     fillOpacity="0.25"
@@ -723,7 +724,7 @@ export default function SuggestionsDisplay() {
                   </circle>
                   <foreignObject
                     x={position.x - 18}
-                    y={position.y + radius - 43}
+                    y={position.y + radius - 3}
                     width={36}
                     height={36}
                     className="pointer-events-none"
