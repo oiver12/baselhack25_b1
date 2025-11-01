@@ -5,11 +5,13 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from app.config import settings
 
-# Add parent directory to path so we can import app modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root directory to path so we can import app modules
+# Get the absolute path to the project root (parent of tests/)
+project_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(project_root))
 
+# Now we can import from app
 from app.services.summary_service import generate_two_word_summary
 
 # Load dummy data from fixtures
@@ -24,7 +26,6 @@ def load_dummy_messages():
             return data.get("messages", [])
     return []
 
-print(settings.OPENAI_API_KEY)
 
 # Inline dummy data as fallback
 DUMMY_MESSAGES = [
@@ -66,6 +67,7 @@ async def test_generate_two_word_summary():
             print(f"{i}. {summary}")
         print("=" * 60)
         print(f"\n✓ Reduced {len(messages)} messages to {len(result)} 2-word summaries")
+        print(result)
         
     except Exception as e:
         print(f"✗ Error: {e}")

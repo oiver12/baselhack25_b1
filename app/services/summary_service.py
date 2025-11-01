@@ -132,6 +132,8 @@ async def generate_two_word_summary(messages: List[str]) -> List[str]:
         summary = response.choices[0].message.content.strip()
         # Clean up the summary to ensure it's exactly 2 words
         words = summary.split()[:2]
+        print(words)
+        print(cluster_messages)
         summary = " ".join(words)
         summaries.append(summary)
     
