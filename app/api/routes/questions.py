@@ -32,6 +32,9 @@ async def create_question(request: QuestionRequest) -> QuestionResponse:
     
     # Create the question state immediately
     create_question_state(question_id, request.question)
+    # Save to cache
+    from app.state import save_all_questions
+    save_all_questions()
     
     # Post the new question to Discord
     from app.discord_bot.bot import get_bot_instance

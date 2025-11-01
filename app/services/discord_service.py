@@ -9,9 +9,13 @@ from app.config import settings
 from app.discord_bot.bot import get_bot_instance
 
 
-async def scrape_discord_history() -> List[DiscordMessage]:
+async def scrape_discord_history(after: Optional[datetime] = None) -> List[DiscordMessage]:
     """
     Scrape Discord chat history for all messages
+    
+    Args:
+        after: Optional datetime - only fetch messages newer than this timestamp
+               If None, performs full scrape of all messages
     
     Returns:
         List of all Discord messages
@@ -46,7 +50,7 @@ async def scrape_discord_history() -> List[DiscordMessage]:
     if bot_loop != current_loop:
         # Run the actual scraping in the bot's loop using run_coroutine_threadsafe
         async def _scrape_in_bot_loop():
-            return await _do_scrape(bot)
+            return await _do_scrape(bot, after=after)
         
         import concurrent.futures
         future = asyncio.run_coroutine_threadsafe(_scrape_in_bot_loop(), bot_loop)
@@ -54,12 +58,24 @@ async def scrape_discord_history() -> List[DiscordMessage]:
         return messages
     else:
         # We're already in the bot's loop, just do it directly
-        return await _do_scrape(bot)
+        return await _do_scrape(bot, after=after)
 
 
-async def _do_scrape(bot) -> List[DiscordMessage]:
-    """Internal function to do the actual scraping - runs in bot's event loop"""
+async def _do_scrape(bot, after: Optional[datetime] = None) -> List[DiscordMessage]:
+    """
+    Internal function to do the actual scraping - runs in bot's event loop
+    
+    Args:
+        bot: Discord bot instance
+        after: Optional datetime - only fetch messages newer than this timestamp
+    """
     messages: List[DiscordMessage] = []
+    
+    # Log scraping mode
+    if after:
+        print(f"🔍 Scraping mode: INCREMENTAL (messages after {after.isoformat()})")
+    else:
+        print(f"🔍 Scraping mode: FULL (all messages)")
     
     # Get guild - try from settings first, otherwise use the first available guild
     guild = None
@@ -83,7 +99,7 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
     
     try:
         # Search through all text channels
-        print(f"Searching {len(guild.text_channels)} text channels for messages...")
+        print(f"📂 Searching {len(guild.text_channels)} text channels for messages...")
         
         for channel in guild.text_channels:
             try:
@@ -92,9 +108,12 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
                     print(f"  Skipping #{channel.name}: no read permission")
                     continue
                 
-                print(f"  Fetching messages from #{channel.name}...")
+                if after:
+                    print(f"  📥 Fetching NEW messages from #{channel.name} (after {after.isoformat()})...")
+                else:
+                    print(f"  📥 Fetching ALL messages from #{channel.name}...")
                 
-                # Fetch ALL messages from channel history
+                # Fetch messages from channel history
                 channel_messages = []
                 
                 # Fetch messages in batches to avoid timeout issues
@@ -114,8 +133,18 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
                         
                         async def fetch_batch():
                             msgs = []
-                            if last_message_id:
-                                # Fetch messages before the last one we got
+                            if after:
+                                # Incremental mode: only fetch messages after the timestamp
+                                async for msg in channel.history(
+                                    limit=fetch_limit,
+                                    after=after,
+                                    oldest_first=False  # Most recent first
+                                ):
+                                    msgs.append(msg)
+                                # For incremental, we typically only need one batch
+                                # Stop after first batch in incremental mode
+                            elif last_message_id:
+                                # Full scrape: Fetch messages before the last one we got
                                 async for msg in channel.history(
                                     limit=fetch_limit,
                                     before=discord.Object(id=last_message_id),
@@ -167,14 +196,20 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
                             )
                             channel_messages.append(discord_message)
                         
-                        # Update last_message_id for next batch
-                        last_message_id = fetched[-1].id
-                        batch_count += 1
-                        
-                        print(f"    Batch {batch_count}: {len(fetched)} messages (total in channel: {len(channel_messages)})")
-                        
-                        # If we got fewer than the limit, we've reached the end
-                        if len(fetched) < fetch_limit:
+                        # Update last_message_id for next batch (only for full scrape)
+                        if not after:
+                            last_message_id = fetched[-1].id
+                            batch_count += 1
+                            
+                            print(f"    📦 Batch {batch_count}: {len(fetched)} messages (total in channel: {len(channel_messages)})")
+                            
+                            # If we got fewer than the limit, we've reached the end
+                            if len(fetched) < fetch_limit:
+                                break
+                        else:
+                            # Incremental mode: only one batch needed
+                            batch_count = 1
+                            print(f"    ✅ Found {len(fetched)} new messages in #{channel.name}")
                             break
                     
                     except Exception as e:
@@ -193,9 +228,9 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
                 
                 messages.extend(channel_messages)
                 if channel_messages:
-                    print(f"  ✓ Found {len(channel_messages)} messages in #{channel.name}")
+                    print(f"  ✅ Found {len(channel_messages)} messages in #{channel.name}")
                 else:
-                    print(f"  - No messages found in #{channel.name}")
+                    print(f"  ⚪ No messages found in #{channel.name}")
             
             except discord.Forbidden:
                 # Bot doesn't have permission to read this channel
@@ -207,7 +242,10 @@ async def _do_scrape(bot) -> List[DiscordMessage]:
                 traceback.print_exc()
                 continue
         
-        print(f"\nTotal messages found across all channels: {len(messages)}")
+        if after:
+            print(f"\n✅ INCREMENTAL scrape complete: Found {len(messages)} NEW messages across all channels")
+        else:
+            print(f"\n✅ FULL scrape complete: Found {len(messages)} total messages across all channels")
         
         # Sort by timestamp (oldest first)
         messages.sort(key=lambda x: x.timestamp)
