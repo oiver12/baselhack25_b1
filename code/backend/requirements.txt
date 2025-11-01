@@ -13,3 +13,4 @@ matplotlib>=3.7.0
 weasyprint>=60.0
 pillow>=10.0.0
 uvicorn-worker==0.4.0
+asyncio==3.4.3

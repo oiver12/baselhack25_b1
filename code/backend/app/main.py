@@ -91,7 +91,6 @@ async def startup_event():
         print("Discord bot thread started")
         
         # Wait for bot to be ready, then fetch historical messages
-        import asyncio
         from app.discord_bot.bot import get_bot_instance
         from app.services.discord_service import scrape_discord_history
         

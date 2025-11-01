@@ -12,6 +12,10 @@ RUN apk add --no-cache \
     g++ \
     libstdc++ \
     openblas \
+    glib \
+    cairo \
+    pango \
+    gdk-pixbuf \
     && rm -rf /var/cache/apk/*
 
 
