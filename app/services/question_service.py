@@ -1,0 +1,316 @@
+"""
+Extracting questions from a list of messages and assing messages to questions
+"""
+from typing import List
+from app.state import DiscordMessage, get_question_state, questions, create_question_state
+from app.config import settings
+from openai import OpenAI
+import numpy as np
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics.pairwise import cosine_similarity
+import uuid
+
+
+async def extract_asked_questions(messages: List[DiscordMessage]) -> List[str]:
+    """
+    Extract asked questions from a list of messages.
+    All messages starting with "!start_discussion" are considered asked questions.
+    """
+    asked_questions = set()
+    for message in messages:
+        if message.content.startswith("!start_discussion"):
+            asked_questions.add(message.content)
+    return list(asked_questions)
+
+async def assign_messages_to_existing_questions(messages: List[DiscordMessage]) -> List[str]:
+    """
+    Assign messages to existing questions using clustering.
+    First tries to assign to questions extracted from !start_discussion commands,
+    then creates up to 3 additional questions from remaining messages (unless <5 messages).
+    Returns the final list of question_ids.
+    """
+    if not messages:
+        return []
+    
+    # First, extract asked questions from !start_discussion commands
+    asked_questions_list = await extract_asked_questions(messages)
+    asked_questions = {}
+    asked_questions_map = {}  # question_text -> question_id
+    
+    # Create question states for asked questions
+    for asked_q_text in asked_questions_list:
+        # Extract the actual question (remove "!start_discussion" prefix)
+        question_text = asked_q_text.replace("!start_discussion", "").strip()
+        if not question_text:
+            continue
+        
+        # Find the message that contains this question
+        question_msg = None
+        for msg in messages:
+            if msg.content == asked_q_text:
+                question_msg = msg
+                break
+        
+        if question_text not in asked_questions_map:
+            # Create new question
+            new_qid = str(uuid.uuid4())
+            create_question_state(new_qid, question_text)
+            asked_questions_map[question_text] = new_qid
+            asked_questions[new_qid] = {
+                'title': question_text,
+                'question_id': new_qid,
+                'sample_messages': []
+            }
+        
+        qid = asked_questions_map[question_text]
+        qstate = get_question_state(qid)
+        if question_msg and not any(m.message_id == question_msg.message_id for m in qstate.discord_messages):
+            qstate.discord_messages.append(question_msg)
+            asked_questions[qid]['sample_messages'].append(question_msg.content)
+    
+    # Get all current questions (id and text) and their sample messages (including asked questions)
+    current_questions = {qid: get_question_state(qid).question for qid in questions.keys()}
+    question_ids_by_text = {v: k for k, v in current_questions.items()}
+    
+    existing_groups = [asked_questions[qid] for qid in asked_questions.keys()]
+    
+    # Track all question IDs
+    updated_questions = dict(question_ids_by_text)
+    for qid in asked_questions_map.values():
+        qstate = get_question_state(qid)
+        updated_questions[qstate.question] = qid
+    
+    all_message_texts = [msg.content for msg in messages]
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    
+    # Generate embeddings for all messages
+    if len(all_message_texts) == 0:
+        return list(question_ids_by_text.values())
+    
+    embedding_response = client.embeddings.create(
+        input=all_message_texts,
+        model="text-embedding-3-small",
+    )
+    embeddings = np.array([item.embedding for item in embedding_response.data])
+    
+    # Match messages to existing questions first
+    matched_to_existing = {}  # message_idx -> (question_id, question_title)
+    unmatched_indices = set(range(len(messages)))
+    
+    if existing_groups:
+        # For each existing question, get representative embeddings
+        for group in existing_groups:
+            if not group['sample_messages']:
+                continue
+                
+            # Get embeddings for sample messages from existing question
+            sample_embeddings_response = client.embeddings.create(
+                input=group['sample_messages'],
+                model="text-embedding-3-small",
+            )
+            group_embeddings = np.array([item.embedding for item in sample_embeddings_response.data])
+            
+            # Calculate similarity between new messages and this group
+            similarities = cosine_similarity(embeddings, group_embeddings)
+            max_similarities = np.max(similarities, axis=1)  # Max similarity per message
+            
+            # Match messages with similarity >= 0.5 to this question (lowered to match more to existing)
+            for msg_idx in list(unmatched_indices):
+                if max_similarities[msg_idx] >= 0.5:
+                    matched_to_existing[msg_idx] = (group['question_id'], group['title'])
+                    unmatched_indices.remove(msg_idx)
+    
+    # Assign matched messages to existing questions
+    for msg_idx, (qid, qtitle) in matched_to_existing.items():
+        qstate = get_question_state(qid)
+        msg = messages[msg_idx]
+        # Only add if not already present
+        if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
+            qstate.discord_messages.append(msg)
+    
+    # Now cluster only the unmatched messages (if any)
+    if unmatched_indices:
+        unmatched_list = list(unmatched_indices)
+        unmatched_messages = [all_message_texts[i] for i in unmatched_list]
+        unmatched_embeddings = embeddings[unmatched_list]
+        
+        # Determine target number of new questions to create
+        # If < 5 messages, be flexible. Otherwise create up to 3 new questions.
+        total_messages = len(messages)
+        
+        if total_messages < 5:
+            # Small dataset - be flexible
+            target_clusters = max(1, len(unmatched_messages))
+        else:
+            # Target 3 new questions maximum
+            target_clusters = min(3, len(unmatched_messages))
+        
+        if len(unmatched_messages) == 0:
+            # No unmatched messages, nothing to do
+            pass
+        elif len(unmatched_messages) == 1:
+            # Single unmatched message - generate question title for it
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that extracts discussion questions from messages. Generate a clear, concise question title (not a 2-word summary, but a full question like 'How should we improve X?' or 'What is your opinion on Y?'). Respond with only the question title, no explanation."},
+                    {"role": "user", "content": f"Extract or create a discussion question from this message:\n{unmatched_messages[0]}"}
+                ],
+                max_tokens=50,
+                temperature=0.3
+            )
+            question_title = response.choices[0].message.content.strip()
+            
+            # Create new question
+            new_qid = str(uuid.uuid4())
+            create_question_state(new_qid, question_title)
+            updated_questions[question_title] = new_qid
+            
+            # Assign message to new question
+            qstate = get_question_state(new_qid)
+            msg = messages[unmatched_list[0]]
+            qstate.discord_messages.append(msg)
+        else:
+            # Multiple unmatched messages - cluster them
+            # Calculate cosine similarity matrix for unmatched messages
+            unmatched_similarity_matrix = cosine_similarity(unmatched_embeddings)
+            unmatched_distance_matrix = 1 - unmatched_similarity_matrix
+            
+            # Use hierarchical clustering targeting the desired number of clusters
+            if total_messages < 5:
+                # For small datasets, use binary search for minimum meaningful clusters
+                best_unmatched_clusters = None
+                min_clusters = 1
+                max_clusters = len(unmatched_messages)
+                
+                # Binary search for minimum clusters
+                while min_clusters < max_clusters:
+                    n_clusters = (min_clusters + max_clusters) // 2
+                    
+                    clustering = AgglomerativeClustering(
+                        n_clusters=n_clusters,
+                        metric='precomputed',
+                        linkage='average'
+                    )
+                    cluster_labels = clustering.fit_predict(unmatched_distance_matrix)
+                    
+                    # Check if clusters are meaningful (average similarity >= 0.4)
+                    valid = True
+                    for cluster_id in range(n_clusters):
+                        cluster_indices = np.where(cluster_labels == cluster_id)[0]
+                        if len(cluster_indices) > 1:
+                            cluster_similarities = unmatched_similarity_matrix[np.ix_(cluster_indices, cluster_indices)]
+                            avg_similarity = np.mean(cluster_similarities[np.triu_indices_from(cluster_similarities, k=1)])
+                            if avg_similarity < 0.4:
+                                valid = False
+                                break
+                    
+                    if valid:
+                        best_unmatched_clusters = cluster_labels
+                        max_clusters = n_clusters
+                    else:
+                        min_clusters = n_clusters + 1
+                
+                # If no good clustering found, use default
+                if best_unmatched_clusters is None:
+                    default_clusters = min(3, len(unmatched_messages))
+                    clustering = AgglomerativeClustering(
+                        n_clusters=default_clusters,
+                        metric='precomputed',
+                        linkage='average'
+                    )
+                    best_unmatched_clusters = clustering.fit_predict(unmatched_distance_matrix)
+            else:
+                # For larger datasets, directly target 3 clusters
+                clustering = AgglomerativeClustering(
+                    n_clusters=target_clusters,
+                    metric='precomputed',
+                    linkage='average'
+                )
+                best_unmatched_clusters = clustering.fit_predict(unmatched_distance_matrix)
+            
+            # Group messages by cluster (store indices, not just text)
+            unique_unmatched_clusters = np.unique(best_unmatched_clusters)
+            unmatched_cluster_groups = {cluster_id: [] for cluster_id in unique_unmatched_clusters}
+            for idx, cluster_id in enumerate(best_unmatched_clusters):
+                # Store the index in unmatched_list, not the message text
+                unmatched_cluster_groups[cluster_id].append(idx)
+            
+            # Generate question title for each new cluster
+            for cluster_id in unique_unmatched_clusters:
+                cluster_indices = unmatched_cluster_groups[cluster_id]
+                cluster_message_texts = [unmatched_messages[i] for i in cluster_indices]
+                
+                # Combine messages in cluster for question extraction
+                combined_text = "\n".join(cluster_message_texts[:5])
+                if len(cluster_message_texts) > 5:
+                    combined_text += f"\n... and {len(cluster_message_texts) - 5} more similar messages"
+                
+                # Add context about existing questions
+                existing_context = ""
+                if existing_groups:
+                    existing_titles = [g['title'] for g in existing_groups]
+                    existing_context = f"\n\nNote: There are already these existing questions: {', '.join(existing_titles)}. Only create a new question if these messages don't fit into any of them."
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that extracts discussion questions from messages. Generate a clear, concise question title (not a 2-word summary, but a full question like 'How should we improve X?' or 'What is your opinion on Y?'). Respond with only the question title, no explanation."},
+                        {"role": "user", "content": f"Extract or create a discussion question from these messages:\n{combined_text}{existing_context}"}
+                    ],
+                    max_tokens=50,
+                    temperature=0.3
+                )
+                
+                question_title = response.choices[0].message.content.strip()
+                
+                # Try to match new question title to existing questions (fuzzy matching)
+                # Check if the new question title is similar to any existing question
+                matched_to_existing_q = False
+                if existing_groups:
+                    # Get embeddings for the new question title and compare to existing
+                    title_embedding_response = client.embeddings.create(
+                        input=[question_title],
+                        model="text-embedding-3-small",
+                    )
+                    title_embedding = np.array([title_embedding_response.data[0].embedding])
+                    
+                    for group in existing_groups:
+                        # Get embedding for existing question title
+                        existing_title_embedding_response = client.embeddings.create(
+                            input=[group['title']],
+                            model="text-embedding-3-small",
+                        )
+                        existing_title_embedding = np.array([existing_title_embedding_response.data[0].embedding])
+                        
+                        # Check similarity
+                        similarity = cosine_similarity(title_embedding, existing_title_embedding)[0][0]
+                        if similarity >= 0.75:  # High threshold for title matching
+                            # Use existing question instead
+                            qid = group['question_id']
+                            matched_to_existing_q = True
+                            break
+                
+                # Create new question if it doesn't already exist and wasn't matched
+                if not matched_to_existing_q and question_title not in updated_questions:
+                    new_qid = str(uuid.uuid4())
+                    create_question_state(new_qid, question_title)
+                    updated_questions[question_title] = new_qid
+                    qid = new_qid
+                elif matched_to_existing_q:
+                    pass  # qid already set above
+                else:
+                    qid = updated_questions[question_title]
+                
+                qstate = get_question_state(qid)
+                
+                # Assign all messages in this cluster to the question
+                for idx_in_unmatched in cluster_indices:
+                    # Get the original message index
+                    msg_idx = unmatched_list[idx_in_unmatched]
+                    msg = messages[msg_idx]
+                    # Only add if not already present
+                    if not any(m.message_id == msg.message_id for m in qstate.discord_messages):
+                        qstate.discord_messages.append(msg)
+    
+    return list(updated_questions.values())
