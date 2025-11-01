@@ -23,6 +23,20 @@ interface MessageStreamProps {
 export default function MessageStream({ uuid }: MessageStreamProps) {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
 
+  const dismissMessage = (messageId: string) => {
+    setMessages((prev) => {
+      // Mark as exiting first
+      return prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isExiting: true } : msg,
+      );
+    });
+
+    // Remove after exit animation
+    setTimeout(() => {
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+    }, EXIT_ANIMATION_DURATION);
+  };
+
   useEffect(() => {
     // Get backend URL from environment variable or use default
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -318,14 +332,35 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
                       >
                         {message.user}
                       </div>
-                      <div 
-                        className="text-xs font-medium shrink-0 opacity-70"
-                        style={{ color: "var(--theme-message-text-secondary)" }}
-                      >
-                        {new Date(message.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="text-xs font-medium shrink-0 opacity-70"
+                          style={{ color: "var(--theme-message-text-secondary)" }}
+                        >
+                          {new Date(message.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                        <button
+                          onClick={() => dismissMessage(message.id)}
+                          className="shrink-0 opacity-40 hover:opacity-100 transition-opacity duration-200 rounded-md p-1 hover:bg-white/10 active:opacity-100"
+                          aria-label="Dismiss message"
+                          style={{ color: "var(--theme-message-text-secondary)" }}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                     <p 
