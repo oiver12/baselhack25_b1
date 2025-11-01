@@ -9,6 +9,8 @@ import type {
 import { Star, TrendingDown, ThumbsUp, ThumbsDown } from "lucide-react";
 import Image from "next/image";
 import * as d3 from "d3-force";
+import * as d3Drag from "d3-drag";
+import * as d3Select from "d3-selection";
 import AnalyticsDashboard from "./AnalyticsDashboard";
 
 // Toggle between mock and real backend
@@ -49,8 +51,36 @@ interface D3Node {
   y: number;
   vx?: number;
   vy?: number;
-  radius: number;
+  fx?: number | null;
+  fy?: number | null;
+  actualRadius: number; // For collisions - just the bubble radius
+  fullRadius: number; // For bounds/positioning - includes children
   data: SuggestionBubbleData;
+}
+
+interface ChildCollisionNode {
+  x: number;
+  y: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+  radius: number; // Actual child bubble size (25-30px)
+  parentNode: D3Node; // Reference to parent
+  childId: string;
+  idealAngle: number;
+  idealDistance: number;
+}
+
+interface ChildD3Node {
+  x: number;
+  y: number;
+  fx?: number | null;
+  fy?: number | null;
+  parentTitle: string;
+  childId: string;
+  idealAngle: number;
+  idealDistance: number;
 }
 
 interface SuggestionsDisplayProps {
@@ -70,6 +100,11 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
   const bubbleDataRef = useRef<Map<string, SuggestionBubbleData>>(new Map());
   const previousDataRef = useRef<Map<string, string>>(new Map());
   const [, setRenderTrigger] = useState(0);
+  const simulationRef = useRef<d3.Simulation<D3Node, undefined> | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const draggedBubbleRef = useRef<{ type: "parent" | "child"; id: string; parentTitle?: string } | null>(null);
+  const childDragSpringForceRef = useRef<{ parentNode: D3Node; childX: number; childY: number; strength: number } | null>(null);
+  const [draggedBubbleId, setDraggedBubbleId] = useState<string | null>(null);
 
   // Auto-increment stage parameter every 2 seconds
   useEffect(() => {
@@ -388,11 +423,36 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
     const bubbles = Array.from(bubbleDataRef.current.values());
     const nodes: D3Node[] = bubbles.map((bubble) => ({
       ...bubble.position,
-      radius: bubble.radius + childDistance + maxChildSize + padding, // Full extent + padding
+      actualRadius: bubble.radius, // For collisions - just the bubble
+      fullRadius: bubble.radius + childDistance + maxChildSize + padding, // For bounds/positioning
       data: bubble,
     }));
 
-    // Custom force to strongly repel overlapping nodes
+    // Create collision nodes for child bubbles
+    const childNodes: ChildCollisionNode[] = [];
+    bubbles.forEach((bubble) => {
+      const parentNode = nodes.find((n) => n.data.suggestion.title === bubble.suggestion.title);
+      if (!parentNode) return;
+
+      bubble.children.forEach((child) => {
+        const childX = parentNode.x + Math.cos(child.angle) * (bubble.radius + 50);
+        const childY = parentNode.y + Math.sin(child.angle) * (bubble.radius + 50);
+        
+        childNodes.push({
+          x: childX,
+          y: childY,
+          vx: 0,
+          vy: 0,
+          radius: child.size, // Actual child bubble size
+          parentNode,
+          childId: child.id,
+          idealAngle: child.angle,
+          idealDistance: bubble.radius + 50,
+        });
+      });
+    });
+
+    // Custom force to strongly repel overlapping nodes (parent-parent collisions)
     const separationForce = () => {
       return () => {
         for (let i = 0; i < nodes.length; i++) {
@@ -406,7 +466,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
             const dx = nodeB.x - nodeA.x;
             const dy = nodeB.y - nodeA.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = nodeA.radius + nodeB.radius;
+            const minDistance = nodeA.actualRadius + nodeB.actualRadius;
 
             // If overlapping or too close, push apart (gentler force for faster settling)
             if (distance < minDistance) {
@@ -424,26 +484,164 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
       };
     };
 
-    // Create d3 force simulation with MAXIMUM collision prevention
+    // Custom force for child-parent collisions
+    const childParentCollisionForce = () => {
+      return () => {
+        childNodes.forEach((childNode) => {
+          const parent = childNode.parentNode;
+          
+          // Skip if parent is hovered or fixed
+          if (parent.data.isHovered || parent.fx !== null || parent.fy !== null) return;
+
+          const dx = childNode.x - parent.x;
+          const dy = childNode.y - parent.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDistance = childNode.radius + parent.actualRadius + 5; // Small threshold to allow orbiting
+
+          if (distance < minDistance) {
+            const force = ((minDistance - distance) / distance) * 0.3;
+            const fx = dx * force;
+            const fy = dy * force;
+
+            // Push parent away (child position is updated from parent)
+            parent.vx = (parent.vx || 0) - fx * 0.5;
+            parent.vy = (parent.vy || 0) - fy * 0.5;
+          }
+        });
+      };
+    };
+
+    // Custom force for child-child collisions
+    const childChildCollisionForce = () => {
+      return () => {
+        for (let i = 0; i < childNodes.length; i++) {
+          for (let j = i + 1; j < childNodes.length; j++) {
+            const childA = childNodes[i];
+            const childB = childNodes[j];
+
+            // Skip if they have the same parent (they're managed by parent position)
+            if (childA.parentNode === childB.parentNode) continue;
+
+            const dx = childB.x - childA.x;
+            const dy = childB.y - childA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = childA.radius + childB.radius;
+
+            if (distance < minDistance) {
+              const force = ((minDistance - distance) / distance) * 0.15;
+              const fx = dx * force;
+              const fy = dy * force;
+
+              // Push parents away
+              childA.parentNode.vx = (childA.parentNode.vx || 0) - fx * 0.3;
+              childA.parentNode.vy = (childA.parentNode.vy || 0) - fy * 0.3;
+              childB.parentNode.vx = (childB.parentNode.vx || 0) + fx * 0.3;
+              childB.parentNode.vy = (childB.parentNode.vy || 0) + fy * 0.3;
+            }
+          }
+        }
+      };
+    };
+
+    // Custom force for child-other-parent collisions
+    // Ensures child bubbles don't overlap with other parent bubbles using actual hitboxes
+    const childOtherParentCollisionForce = () => {
+      return () => {
+        childNodes.forEach((childNode) => {
+          nodes.forEach((otherParent) => {
+            // Skip if it's the child's own parent (handled by childParentCollisionForce)
+            if (otherParent === childNode.parentNode) return;
+            
+            // Skip if either parent is hovered or fixed (being dragged)
+            if (
+              childNode.parentNode.data.isHovered ||
+              childNode.parentNode.fx !== null ||
+              childNode.parentNode.fy !== null ||
+              otherParent.data.isHovered ||
+              otherParent.fx !== null ||
+              otherParent.fy !== null
+            ) {
+              return;
+            }
+
+            // Check collision between child and other parent using actual radii
+            const dx = childNode.x - otherParent.x;
+            const dy = childNode.y - otherParent.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = childNode.radius + otherParent.actualRadius;
+
+            if (distance < minDistance) {
+              // Calculate repulsion force
+              const force = ((minDistance - distance) / distance) * 0.25;
+              const fx = dx * force;
+              const fy = dy * force;
+
+              // Push both parent bubbles away from each other
+              // Child's parent moves away from other parent
+              childNode.parentNode.vx = (childNode.parentNode.vx || 0) - fx * 0.5;
+              childNode.parentNode.vy = (childNode.parentNode.vy || 0) - fy * 0.5;
+              
+              // Other parent moves away from child
+              otherParent.vx = (otherParent.vx || 0) + fx * 0.5;
+              otherParent.vy = (otherParent.vy || 0) + fy * 0.5;
+            }
+          });
+        });
+      };
+    };
+
+    // Custom spring force for child bubble dragging
+    const childDragSpringForce = () => {
+      return () => {
+        const spring = childDragSpringForceRef.current;
+        if (!spring) return;
+        
+        const { parentNode, childX, childY, strength } = spring;
+        
+        // Only apply if parent is not fixed
+        if (parentNode.fx === null && parentNode.fy === null) {
+          const dx = childX - parentNode.x;
+          const dy = childY - parentNode.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance > 0) {
+            // Apply spring force toward child position
+            const force = distance * strength;
+            parentNode.vx = (parentNode.vx || 0) + (dx / distance) * force;
+            parentNode.vy = (parentNode.vy || 0) + (dy / distance) * force;
+          }
+        }
+      };
+    };
+
+    // Create d3 force simulation with precise collision prevention
     const simulation = d3
       .forceSimulation<D3Node>(nodes)
-      // PRIMARY COLLISION FORCE - strongest settings
+      // PRIMARY COLLISION FORCE - use actual radius for collisions
       .force(
         "collide",
         d3
           .forceCollide<D3Node>()
-          .radius((d) => d.radius) // Use full radius
+          .radius((d) => d.actualRadius) // Use actual bubble radius, not extended
           .strength(1.0) // Maximum strength
           .iterations(5), // More iterations for precision
       )
-      // CUSTOM SEPARATION FORCE - extra repulsion
+      // CUSTOM SEPARATION FORCE - extra repulsion between parents
       .force("separation", separationForce())
-      // MANY-BODY FORCE - nodes repel each other
+      // CHILD-PARENT COLLISION - prevent children from overlapping their own parent
+      .force("childParentCollision", childParentCollisionForce())
+      // CHILD-OTHER-PARENT COLLISION - prevent children from overlapping other parents
+      .force("childOtherParentCollision", childOtherParentCollisionForce())
+      // CHILD-CHILD COLLISION - prevent children from overlapping each other
+      .force("childChildCollision", childChildCollisionForce())
+      // SPRING FORCE - for child bubble dragging (only active when child is dragged)
+      .force("childDragSpring", childDragSpringForce())
+      // MANY-BODY FORCE - nodes repel each other based on actual radius
       .force(
         "charge",
         d3
           .forceManyBody<D3Node>()
-          .strength((d) => -d.radius * 8) // Slightly reduced from 10 to prevent over-pushing
+          .strength((d) => -d.actualRadius * 8) // Scale with actual radius
           .distanceMin(10)
           .distanceMax(400),
       )
@@ -460,13 +658,18 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
       // Minimal alpha target - simulation essentially stops
       .alphaTarget(0);
 
+    // Store simulation reference for drag handlers
+    simulationRef.current = simulation;
+
     // Update positions on each tick
     simulation.on("tick", () => {
       nodes.forEach((node) => {
         const bubble = node.data;
 
-        // Skip physics for hovered bubbles
-        if (bubble.isHovered) {
+        // Skip physics for hovered or dragged bubbles
+        const isBeingDragged = draggedBubbleRef.current?.type === "parent" && 
+          draggedBubbleRef.current.id === bubble.suggestion.title;
+        if (bubble.isHovered && !isBeingDragged) {
           // Reset node position to bubble's frozen position
           node.x = bubble.position.x;
           node.y = bubble.position.y;
@@ -481,10 +684,12 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
           const dx = node.x - other.position.x;
           const dy = node.y - other.position.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
+          const otherNode = nodes.find((n) => n.data.suggestion.title === other.suggestion.title);
+          if (!otherNode) return false;
           return (
             dist <
-            node.radius +
-              (other.radius + childDistance + maxChildSize + padding) +
+            node.actualRadius +
+              otherNode.actualRadius +
               100
           );
         });
@@ -497,48 +702,58 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
           return;
         }
 
-        // Clamp to bounds BEFORE updating bubble position
-        const fullRadius =
-          bubble.radius + childDistance + maxChildSize + padding;
-        node.x = Math.max(fullRadius, Math.min(width - fullRadius, node.x));
-        node.y = Math.max(fullRadius, Math.min(height - fullRadius, node.y));
+        // Clamp to bounds BEFORE updating bubble position (use full radius for bounds)
+        node.x = Math.max(node.fullRadius, Math.min(width - node.fullRadius, node.x));
+        node.y = Math.max(node.fullRadius, Math.min(height - node.fullRadius, node.y));
 
-        // Push away from header exclusion zone
+        // Push away from header exclusion zone (rectangle-based collision)
         const headerExclusionBottom = headerExclusionZone.y + headerExclusionZone.height;
-        // Check if bubble (including its full radius) would overlap header
-        if (node.y - fullRadius < headerExclusionBottom) {
-          // Calculate how much we need to push down
-          const overlap = headerExclusionBottom - (node.y - fullRadius);
+        // Check if bubble center is within header zone, or if bubble overlaps header rectangle
+        if (node.y - node.actualRadius < headerExclusionBottom) {
+          // Calculate overlap with header rectangle
+          const overlap = headerExclusionBottom - (node.y - node.actualRadius);
           if (overlap > 0) {
             // Strong push force to move bubble down
             const pushForce = overlap * 0.5;
             node.vy = (node.vy || 0) + pushForce;
-            // Clamp position to keep bubble fully below header
-            node.y = Math.max(headerExclusionBottom + fullRadius + 10, node.y);
+            // Clamp position to keep bubble center + radius fully below header
+            node.y = Math.max(headerExclusionBottom + node.actualRadius + 10, node.y);
           }
         }
 
-        // Push away from analytics exclusion zone
+        // Push away from analytics exclusion zone (precise rectangle-based collision)
         if (exclusionZone) {
-          const exCenterX = exclusionZone.x + exclusionZone.width / 2;
-          const exCenterY = exclusionZone.y + exclusionZone.height / 2;
-          const exRadius = Math.sqrt(exclusionZone.width ** 2 + exclusionZone.height ** 2) / 2 + fullRadius + 20;
+          // Check if bubble circle overlaps with rectangle
+          // Find closest point on rectangle to bubble center
+          const closestX = Math.max(exclusionZone.x, Math.min(node.x, exclusionZone.x + exclusionZone.width));
+          const closestY = Math.max(exclusionZone.y, Math.min(node.y, exclusionZone.y + exclusionZone.height));
           
-          const dx = node.x - exCenterX;
-          const dy = node.y - exCenterY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+          const dx = node.x - closestX;
+          const dy = node.y - closestY;
+          const distSq = dx * dx + dy * dy;
+          const minDistSq = node.actualRadius * node.actualRadius;
           
-          if (dist < exRadius) {
-            // Push away from exclusion zone
-            const pushForce = ((exRadius - dist) / dist) * 0.5;
-            node.vx = (node.vx || 0) + dx * pushForce;
-            node.vy = (node.vy || 0) + dy * pushForce;
-            
-            // Also clamp to keep outside exclusion zone
-            const angle = Math.atan2(dy, dx);
-            const minDist = exRadius;
-            node.x = exCenterX + Math.cos(angle) * minDist;
-            node.y = exCenterY + Math.sin(angle) * minDist;
+          if (distSq < minDistSq) {
+            // Bubble overlaps rectangle - push away from closest point
+            const dist = Math.sqrt(distSq);
+            if (dist > 0) {
+              const pushForce = ((node.actualRadius - dist) / dist) * 0.5;
+              node.vx = (node.vx || 0) + (dx / dist) * pushForce;
+              node.vy = (node.vy || 0) + (dy / dist) * pushForce;
+              
+              // Clamp to keep outside rectangle
+              const minDist = node.actualRadius + 5;
+              node.x = closestX + (dx / dist) * minDist;
+              node.y = closestY + (dy / dist) * minDist;
+            } else {
+              // Center is inside rectangle, push toward center of container
+              const containerCenterX = width / 2;
+              const containerCenterY = height / 2;
+              const pushX = (containerCenterX - node.x) * 0.1;
+              const pushY = (containerCenterY - node.y) * 0.1;
+              node.vx = (node.vx || 0) + pushX;
+              node.vy = (node.vy || 0) + pushY;
+            }
           }
         }
 
@@ -556,14 +771,223 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
         bubble.isMoving = speed > 0.05; // Very low threshold - animations stop almost immediately
       });
 
+      // Update child node positions based on parent positions and angles
+      childNodes.forEach((childNode) => {
+        const parent = childNode.parentNode;
+        const bubble = bubbleDataRef.current.get(parent.data.suggestion.title);
+        if (!bubble) return;
+
+        // Find the child data to get current angle
+        const child = bubble.children.find((c) => c.id === childNode.childId);
+        if (!child) return;
+
+        // Calculate child position based on parent position and angle
+        const childDistance = bubble.radius + 50;
+        childNode.x = parent.x + Math.cos(child.angle) * childDistance;
+        childNode.y = parent.y + Math.sin(child.angle) * childDistance;
+      });
+
       setRenderTrigger((prev) => prev + 1);
     });
 
     // Cleanup
     return () => {
       simulation.stop();
+      simulationRef.current = null;
     };
   }, [bubbleCount]); // Re-run when number of bubbles changes
+
+  // Parent bubble drag handlers
+  const parentDragStarted = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => {
+    const node = event.subject;
+    if (!node) return;
+
+    // Fix position during drag
+    node.fx = node.x;
+    node.fy = node.y;
+    
+    // Track which bubble is being dragged
+    draggedBubbleRef.current = { type: "parent", id: node.data.suggestion.title };
+    setDraggedBubbleId(node.data.suggestion.title);
+
+    // Restart simulation if needed
+    if (simulationRef.current && !event.active) {
+      simulationRef.current.alphaTarget(0.3).restart();
+    }
+  }, []);
+
+  const parentDragging = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => {
+    const node = event.subject;
+    if (!node || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const bubble = node.data;
+
+    // Clamp to bounds (use full radius for bounds)
+    let newX = Math.max(node.fullRadius, Math.min(width - node.fullRadius, event.x));
+    let newY = Math.max(node.fullRadius, Math.min(height - node.fullRadius, event.y));
+
+    // Clamp to header exclusion zone (use actual radius for collision check)
+    const headerHeight = 80;
+    const headerExclusionBottom = headerHeight + 50;
+    if (newY - node.actualRadius < headerExclusionBottom) {
+      newY = Math.max(headerExclusionBottom + node.actualRadius + 10, newY);
+    }
+
+    // Clamp to analytics exclusion zone (rectangle-based collision)
+    try {
+      const exclusionData = container.getAttribute('data-analytics-exclusion');
+      if (exclusionData) {
+        const parsed = JSON.parse(exclusionData);
+        if (parsed.width > 0 && parsed.height > 0) {
+          const exclusionPadding = 30;
+          const exclusionZone = {
+            x: parsed.x - exclusionPadding,
+            y: parsed.y - exclusionPadding,
+            width: parsed.width + exclusionPadding * 2,
+            height: parsed.height + exclusionPadding * 2,
+          };
+
+          // Find closest point on rectangle to bubble center
+          const closestX = Math.max(exclusionZone.x, Math.min(newX, exclusionZone.x + exclusionZone.width));
+          const closestY = Math.max(exclusionZone.y, Math.min(newY, exclusionZone.y + exclusionZone.height));
+          
+          const dx = newX - closestX;
+          const dy = newY - closestY;
+          const distSq = dx * dx + dy * dy;
+          const minDistSq = node.actualRadius * node.actualRadius;
+          
+          if (distSq < minDistSq) {
+            // Push away from rectangle
+            const dist = Math.sqrt(distSq);
+            if (dist > 0) {
+              const minDist = node.actualRadius + 5;
+              newX = closestX + (dx / dist) * minDist;
+              newY = closestY + (dy / dist) * minDist;
+            } else {
+              // Center is inside rectangle, push toward center of container
+              const containerCenterX = width / 2;
+              const containerCenterY = height / 2;
+              newX = containerCenterX + (containerCenterX - newX) * 0.5;
+              newY = containerCenterY + (containerCenterY - newY) * 0.5;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    // Update position
+    node.fx = newX;
+    node.fy = newY;
+    bubble.position.x = newX;
+    bubble.position.y = newY;
+
+    // Recalculate child positions maintaining angles
+    const childDistance = bubble.radius + 50;
+    bubble.children.forEach((child) => {
+      const childX = newX + Math.cos(child.angle) * childDistance;
+      const childY = newY + Math.sin(child.angle) * childDistance;
+      // Child positions will be updated in render
+    });
+
+    setRenderTrigger((prev) => prev + 1);
+  }, []);
+
+  const parentDragEnded = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => {
+    const node = event.subject;
+    if (!node) return;
+
+    // Release physics constraint
+    node.fx = null;
+    node.fy = null;
+
+    // Let simulation settle
+    if (simulationRef.current) {
+      simulationRef.current.alphaTarget(0);
+    }
+
+    // Clear drag state
+    draggedBubbleRef.current = null;
+    setDraggedBubbleId(null);
+  }, []);
+
+  // Child bubble drag handlers
+  const childDragStarted = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => {
+    const data = event.subject;
+    if (!data || !simulationRef.current) return;
+
+    // Find the parent node
+    const nodes = simulationRef.current.nodes();
+    const parentNode = nodes.find((n) => n.data.suggestion.title === data.parentTitle);
+    if (!parentNode) return;
+
+    // Store initial child position
+    const childX = data.childX;
+    const childY = data.childY;
+
+    // Track which child is being dragged
+    draggedBubbleRef.current = { 
+      type: "child", 
+      id: data.childId,
+      parentTitle: data.parentTitle 
+    };
+    setDraggedBubbleId(data.childId);
+
+    // Set up spring force to pull parent toward child
+    childDragSpringForceRef.current = {
+      parentNode,
+      childX,
+      childY,
+      strength: 0.15, // Spring constant
+    };
+
+    // Restart simulation if needed
+    if (!event.active) {
+      simulationRef.current.alphaTarget(0.3).restart();
+    }
+  }, []);
+
+  const childDragging = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => {
+    const data = event.subject;
+    if (!data || !childDragSpringForceRef.current || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    // Clamp to bounds (child bubbles are smaller, so use smaller radius)
+    const childRadius = 30;
+    let newX = Math.max(childRadius, Math.min(width - childRadius, event.x));
+    let newY = Math.max(childRadius, Math.min(height - childRadius, event.y));
+
+    // Update child position in spring force
+    childDragSpringForceRef.current.childX = newX;
+    childDragSpringForceRef.current.childY = newY;
+
+    // Update stored position for rendering
+    data.childX = newX;
+    data.childY = newY;
+
+    setRenderTrigger((prev) => prev + 1);
+  }, []);
+
+  const childDragEnded = useCallback((event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => {
+    // Remove spring force
+    childDragSpringForceRef.current = null;
+
+    // Let simulation settle
+    if (simulationRef.current) {
+      simulationRef.current.alphaTarget(0);
+    }
+
+    // Clear drag state
+    draggedBubbleRef.current = null;
+    setDraggedBubbleId(null);
+  }, []);
 
   const handleParentHover = useCallback(
     (title: string, isHovering: boolean) => {
@@ -597,6 +1021,92 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
   const handleChildBubbleLeave = useCallback(() => {
     setHoveredBubble(null);
   }, []);
+
+  // Attach drag behaviors to SVG circles
+  useEffect(() => {
+    if (!svgRef.current || bubbleCount === 0 || !simulationRef.current) return;
+
+    const svg = d3Select.select(svgRef.current);
+
+    // Create parent drag behavior
+    const parentDrag = d3Drag.drag<SVGCircleElement, unknown>()
+      .subject((event) => {
+        // Find the parent node that corresponds to this circle
+        // Traverse up the DOM tree to find the circle with data-parent-bubble
+        let target = event.sourceEvent.target as Element;
+        let parentTitle: string | null = null;
+        
+        // Traverse up to find the circle element with data-parent-bubble attribute
+        while (target && target !== svgRef.current) {
+          parentTitle = target.getAttribute("data-parent-bubble");
+          if (parentTitle) break;
+          target = target.parentElement as Element;
+        }
+        
+        if (!parentTitle) return null;
+        
+        const nodes = simulationRef.current?.nodes() || [];
+        return nodes.find((n) => n.data.suggestion.title === parentTitle) || null;
+      })
+      .on("start", parentDragStarted as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => void)
+      .on("drag", parentDragging as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => void)
+      .on("end", parentDragEnded as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, D3Node>) => void);
+
+    // Create child drag behavior
+    const childDrag = d3Drag.drag<SVGCircleElement, unknown>()
+      .subject((event) => {
+        // Extract child bubble data from data attributes
+        // Traverse up the DOM tree to find the circle with data-child-bubble
+        let target = event.sourceEvent.target as Element;
+        let childId: string | null = null;
+        let parentTitle: string | null = null;
+        
+        // Traverse up to find the circle element with data-child-bubble attribute
+        while (target && target !== svgRef.current) {
+          childId = target.getAttribute("data-child-bubble");
+          if (childId) {
+            parentTitle = target.getAttribute("data-child-parent");
+            const childX = parseFloat(target.getAttribute("data-child-x") || "0");
+            const childY = parseFloat(target.getAttribute("data-child-y") || "0");
+            const idealAngle = parseFloat(target.getAttribute("data-child-angle") || "0");
+            const idealDistance = parseFloat(target.getAttribute("data-child-distance") || "0");
+            
+            if (parentTitle) {
+              return {
+                parentTitle,
+                childId,
+                childX,
+                childY,
+                idealAngle,
+                idealDistance,
+              };
+            }
+            break;
+          }
+          target = target.parentElement as Element;
+        }
+        
+        return null;
+      })
+      .on("start", childDragStarted as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => void)
+      .on("drag", childDragging as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => void)
+      .on("end", childDragEnded as (event: d3Drag.D3DragEvent<SVGCircleElement, unknown, { parentTitle: string; childId: string; childX: number; childY: number; idealAngle: number; idealDistance: number }>) => void);
+
+    // Apply drag behaviors
+    svg.selectAll<SVGCircleElement, unknown>("circle[data-parent-bubble]")
+      .call(parentDrag);
+
+    svg.selectAll<SVGCircleElement, unknown>("circle[data-child-bubble]")
+      .call(childDrag);
+
+    // Cleanup
+    return () => {
+      svg.selectAll<SVGCircleElement, unknown>("circle[data-parent-bubble]")
+        .on(".drag", null);
+      svg.selectAll<SVGCircleElement, unknown>("circle[data-child-bubble]")
+        .on(".drag", null);
+    };
+  }, [bubbleCount, parentDragStarted, parentDragging, parentDragEnded, childDragStarted, childDragging, childDragEnded]);
 
   if (suggestions.length === 0) {
     return (
@@ -676,6 +1186,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
       {/* biome-ignore lint/a11y/noSvgWithoutTitle: aria-label provides accessible name */}
       <svg
+        ref={svgRef}
         className="w-full h-full relative z-10"
         aria-label="Suggestion bubbles visualization"
       >
@@ -825,12 +1336,37 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                 />
               )}
 
-              {/* Lines connecting parent to children - enhanced */}
+              {/* Lines connecting parent to children - stretchy connections */}
               {children.map((child) => {
-                const childX =
-                  position.x + Math.cos(child.angle) * childDistance;
-                const childY =
-                  position.y + Math.sin(child.angle) * childDistance;
+                // Calculate actual child position (may be dragged)
+                let childX: number;
+                let childY: number;
+                const isChildDragged = draggedBubbleRef.current?.type === "child" && 
+                  draggedBubbleRef.current.id === child.id;
+                
+                if (isChildDragged && childDragSpringForceRef.current) {
+                  // Use actual dragged position
+                  childX = childDragSpringForceRef.current.childX;
+                  childY = childDragSpringForceRef.current.childY;
+                } else {
+                  // Use angle-based position
+                  childX = position.x + Math.cos(child.angle) * childDistance;
+                  childY = position.y + Math.sin(child.angle) * childDistance;
+                }
+
+                // Calculate stretch ratio
+                const idealDistance = childDistance;
+                const actualDistance = Math.sqrt(
+                  Math.pow(childX - position.x, 2) + Math.pow(childY - position.y, 2)
+                );
+                const stretchRatio = actualDistance / idealDistance;
+
+                // Update line properties based on stretch
+                const baseStrokeWidth = isParentHovered ? 3 : 2;
+                const strokeWidth = baseStrokeWidth + (stretchRatio > 1 ? (stretchRatio - 1) * 2 : 0);
+                const opacity = isParentHovered 
+                  ? Math.min(0.7, 0.5 + (stretchRatio > 1 ? (stretchRatio - 1) * 0.2 : 0))
+                  : Math.min(0.4, 0.2 + (stretchRatio > 1 ? (stretchRatio - 1) * 0.1 : 0));
 
                 return (
                   <line
@@ -840,8 +1376,8 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                     x2={childX}
                     y2={childY}
                     stroke="var(--theme-bubble-primary-from)"
-                    strokeWidth={isParentHovered ? "3" : "2"}
-                    opacity={isParentHovered ? "0.5" : "0.2"}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
                     className="transition-all duration-300"
                     strokeDasharray={isParentHovered ? "0" : "5,5"}
                   />
@@ -850,20 +1386,22 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
               {/* Main suggestion bubble */}
               <g className="transition-all duration-300">
-                {/* Invisible larger hover area */}
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG circle used for visual graph interaction */}
-                <circle
-                  cx={position.x}
-                  cy={position.y}
-                  r={radius + 10}
-                  fill="transparent"
-                  className="cursor-pointer"
-                  onMouseEnter={() => handleParentHover(suggestion.title, true)}
-                  onMouseLeave={() =>
-                    handleParentHover(suggestion.title, false)
-                  }
-                  aria-label={suggestion.title}
-                />
+                {/* Invisible larger hover area - only if not being dragged */}
+                {draggedBubbleId !== suggestion.title && (
+                  /* biome-ignore lint/a11y/noStaticElementInteractions: SVG circle used for visual graph interaction */
+                  <circle
+                    cx={position.x}
+                    cy={position.y}
+                    r={radius + 10}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => handleParentHover(suggestion.title, true)}
+                    onMouseLeave={() =>
+                      handleParentHover(suggestion.title, false)
+                    }
+                    aria-label={suggestion.title}
+                  />
+                )}
 
                 {/* Outer ring */}
                 <circle
@@ -878,17 +1416,29 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
                 {/* Main bubble */}
                 <circle
+                  data-parent-bubble={suggestion.title}
                   cx={position.x}
                   cy={position.y}
                   r={radius}
                   fill="url(#gradient-blue)"
-                  className={`transition-all duration-300 pointer-events-none ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${isMoving ? "drop-shadow-2xl" : ""}`}
+                  className={`transition-all duration-300 ${isParentHovered ? "drop-shadow-2xl" : "drop-shadow-lg"} ${isMoving ? "drop-shadow-2xl" : ""} ${draggedBubbleId === suggestion.title ? "cursor-grabbing" : "cursor-pointer"}`}
                   filter={isParentHovered || isMoving ? "url(#soft-glow)" : ""}
                   style={{
                     transform: isParentHovered ? "scale(1.05)" : "scale(1)",
                     transformOrigin: `${position.x}px ${position.y}px`,
+                    opacity: draggedBubbleId === suggestion.title ? 0.9 : (isMoving ? 0.95 : 1),
+                    pointerEvents: "auto",
                   }}
-                  opacity={isMoving ? "0.95" : "1"}
+                  onMouseEnter={() => {
+                    if (draggedBubbleId !== suggestion.title) {
+                      handleParentHover(suggestion.title, true);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (draggedBubbleId !== suggestion.title) {
+                      handleParentHover(suggestion.title, false);
+                    }
+                  }}
                 />
 
                 {/* Glass effect overlay */}
@@ -956,10 +1506,21 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
 
               {/* Child bubbles - enhanced */}
               {children.map((child) => {
-                const childX =
-                  position.x + Math.cos(child.angle) * childDistance;
-                const childY =
-                  position.y + Math.sin(child.angle) * childDistance;
+                // Calculate actual child position (may be dragged)
+                let childX: number;
+                let childY: number;
+                const isChildDragged = draggedBubbleRef.current?.type === "child" && 
+                  draggedBubbleRef.current.id === child.id;
+                
+                if (isChildDragged && childDragSpringForceRef.current) {
+                  // Use actual dragged position
+                  childX = childDragSpringForceRef.current.childX;
+                  childY = childDragSpringForceRef.current.childY;
+                } else {
+                  // Use angle-based position
+                  childX = position.x + Math.cos(child.angle) * childDistance;
+                  childY = position.y + Math.sin(child.angle) * childDistance;
+                }
 
                 let gradient = "url(#gradient-opinion)";
                 if (child.type === "pros") gradient = "url(#gradient-green)";
@@ -973,24 +1534,26 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                       opacity: isParentHovered ? 1 : 0.7,
                     }}
                   >
-                    {/* Invisible larger hover area */}
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG circle used for visual graph interaction */}
-                    <circle
-                      cx={childX}
-                      cy={childY}
-                      r={child.size + 10}
-                      fill="transparent"
-                      className="cursor-pointer"
-                      onMouseEnter={(e) => {
-                        handleParentHover(suggestion.title, true);
-                        handleChildBubbleHover(child, e);
-                      }}
-                      onMouseLeave={() => {
-                        handleChildBubbleLeave();
-                        handleParentHover(suggestion.title, false);
-                      }}
-                      aria-label={child.type}
-                    />
+                    {/* Invisible larger hover area - only if not being dragged */}
+                    {draggedBubbleId !== child.id && (
+                      /* biome-ignore lint/a11y/noStaticElementInteractions: SVG circle used for visual graph interaction */
+                      <circle
+                        cx={childX}
+                        cy={childY}
+                        r={child.size + 10}
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onMouseEnter={(e) => {
+                          handleParentHover(suggestion.title, true);
+                          handleChildBubbleHover(child, e);
+                        }}
+                        onMouseLeave={() => {
+                          handleChildBubbleLeave();
+                          handleParentHover(suggestion.title, false);
+                        }}
+                        aria-label={child.type}
+                      />
+                    )}
 
                     {/* Outer ring for child */}
                     <circle
@@ -1002,14 +1565,36 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                       className="pointer-events-none"
                     />
 
-                    {/* Child bubble */}
+                    {/* Child bubble - draggable */}
                     <circle
+                      data-child-bubble={child.id}
+                      data-child-parent={suggestion.title}
+                      data-child-x={childX}
+                      data-child-y={childY}
+                      data-child-angle={child.angle}
+                      data-child-distance={childDistance}
                       cx={childX}
                       cy={childY}
                       r={child.size}
                       fill={gradient}
-                      className="drop-shadow-lg pointer-events-none transition-all"
+                      className={`drop-shadow-lg transition-all ${draggedBubbleId === child.id ? "cursor-grabbing" : "cursor-pointer"}`}
                       filter="url(#soft-glow)"
+                      style={{
+                        opacity: draggedBubbleId === child.id ? 0.9 : undefined,
+                        pointerEvents: draggedBubbleId === child.id ? "all" : "auto",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (draggedBubbleId !== child.id) {
+                          handleParentHover(suggestion.title, true);
+                          handleChildBubbleHover(child, e);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (draggedBubbleId !== child.id) {
+                          handleChildBubbleLeave();
+                          handleParentHover(suggestion.title, false);
+                        }
+                      }}
                     />
 
                     {/* Glass overlay */}

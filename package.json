@@ -10,6 +10,7 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "lucide-react": "^0.552.0",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
     "@tailwindcss/postcss": "^4",
+    "@types/d3-drag": "^3.0.0",
     "@types/d3-force": "^3.0.10",
     "@types/d3-selection": "^3.0.11",
     "@types/node": "^20",
