@@ -14,6 +14,7 @@ const MAX_TOAST_DURATION = 8000; // 8 seconds
 const MAX_VISIBLE_TOASTS = 5;
 const EXIT_ANIMATION_DURATION = 300; // 300ms for fade out
 const SIMULTANEOUS_THRESHOLD = 500; // Messages within 500ms are considered simultaneous
+const MESSAGE_DELAY = 300; // Delay in ms before displaying messages, even when pending/connecting
 
 interface MessageStreamProps {
   uuid: string;
@@ -39,6 +40,88 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
     let isManualClose = false;
     const maxReconnectDelay = 30000; // 30 seconds max delay
     let reconnectAttempts = 0;
+    
+    // Message queue for messages received while websocket is pending/connecting
+    interface QueuedMessage {
+      data: any;
+      receivedAt: number;
+    }
+    const messageQueue: QueuedMessage[] = [];
+    
+    // Function to process a message with delay
+    const processMessage = (data: any, receivedAt: number) => {
+      // Always apply MESSAGE_DELAY before displaying, even if message was queued
+      // This ensures consistent delay behavior regardless of connection state
+      const delay = MESSAGE_DELAY;
+      
+      setTimeout(() => {
+        if (data.type === "message") {
+          const now = Date.now();
+          const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
+
+          setMessages((prev) => {
+            // Check if this message arrives at the same time as the last one
+            const lastMessage = prev[prev.length - 1];
+            const isSimultaneous =
+              lastMessage &&
+              now - lastMessage.timestamp < SIMULTANEOUS_THRESHOLD;
+
+            // Use the same group ID if simultaneous, otherwise get next group ID
+            let groupId: number;
+            if (isSimultaneous && lastMessage.groupId !== undefined) {
+              groupId = lastMessage.groupId;
+            } else {
+              // Get the highest group ID from existing messages and add 1
+              const maxGroupId = prev.reduce(
+                (max, msg) => Math.max(max, msg.groupId ?? -1),
+                -1,
+              );
+              groupId = maxGroupId + 1;
+            }
+
+            const newMessage: ToastMessage = {
+              id: messageId,
+              user: data.user,
+              message: data.message,
+              profilePicUrl: data.profilePicUrl,
+              timestamp: now,
+              isExiting: false,
+              groupId,
+            };
+
+            // Add new message at the end (will appear at top of stack)
+            const updated = [...prev, newMessage];
+            // Keep only the most recent messages
+            return updated.slice(-MAX_VISIBLE_TOASTS);
+          });
+
+          // Auto-dismiss after duration
+          setTimeout(() => {
+            setMessages((prev) => {
+              // Mark as exiting first
+              return prev.map((msg) =>
+                msg.id === messageId ? { ...msg, isExiting: true } : msg,
+              );
+            });
+
+            // Remove after exit animation
+            setTimeout(() => {
+              setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+            }, EXIT_ANIMATION_DURATION);
+          }, MAX_TOAST_DURATION);
+        }
+      }, delay);
+    };
+    
+    // Function to process queued messages when connection is ready
+    const processQueue = () => {
+      while (messageQueue.length > 0) {
+        const queued = messageQueue.shift();
+        if (queued) {
+          processMessage(queued.data, queued.receivedAt);
+        }
+      }
+    };
 
     const connect = () => {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
@@ -52,11 +135,14 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
         ws.onopen = () => {
           console.log("WebSocket connected successfully");
           reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+          // Process any messages that were queued while connecting
+          processQueue();
         };
 
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            const receivedAt = Date.now();
 
             if (data.type === "connected") {
               console.log("WebSocket connection confirmed:", data.message);
@@ -68,60 +154,18 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
               return;
             }
 
+            // Check if websocket is in a pending/connecting state or not fully open
+            const isPending = !ws || ws.readyState !== WebSocket.OPEN;
+            
             if (data.type === "message") {
-              const now = Date.now();
-              const messageId = `${now}-${Math.random().toString(16).slice(2)}`;
-
-              setMessages((prev) => {
-                // Check if this message arrives at the same time as the last one
-                const lastMessage = prev[prev.length - 1];
-                const isSimultaneous =
-                  lastMessage &&
-                  now - lastMessage.timestamp < SIMULTANEOUS_THRESHOLD;
-
-                // Use the same group ID if simultaneous, otherwise get next group ID
-                let groupId: number;
-                if (isSimultaneous && lastMessage.groupId !== undefined) {
-                  groupId = lastMessage.groupId;
-                } else {
-                  // Get the highest group ID from existing messages and add 1
-                  const maxGroupId = prev.reduce(
-                    (max, msg) => Math.max(max, msg.groupId ?? -1),
-                    -1,
-                  );
-                  groupId = maxGroupId + 1;
-                }
-
-                const newMessage: ToastMessage = {
-                  id: messageId,
-                  user: data.user,
-                  message: data.message,
-                  profilePicUrl: data.profilePicUrl,
-                  timestamp: now,
-                  isExiting: false,
-                  groupId,
-                };
-
-                // Add new message at the end (will appear at top of stack)
-                const updated = [...prev, newMessage];
-                // Keep only the most recent messages
-                return updated.slice(-MAX_VISIBLE_TOASTS);
-              });
-
-              // Auto-dismiss after duration
-              setTimeout(() => {
-                setMessages((prev) => {
-                  // Mark as exiting first
-                  return prev.map((msg) =>
-                    msg.id === messageId ? { ...msg, isExiting: true } : msg,
-                  );
-                });
-
-                // Remove after exit animation
-                setTimeout(() => {
-                  setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-                }, EXIT_ANIMATION_DURATION);
-              }, MAX_TOAST_DURATION);
+              if (isPending) {
+                // Queue the message if websocket is not fully open
+                console.log("WebSocket pending, queueing message");
+                messageQueue.push({ data, receivedAt });
+              } else {
+                // Process immediately with delay if connection is open
+                processMessage(data, receivedAt);
+              }
             }
           } catch (err) {
             console.error("Error parsing WebSocket message:", err);
