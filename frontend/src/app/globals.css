@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+:root {
+  /* Background colors */
+  --background: #ffffff;
+  --foreground: #171717;
+  
+  /* Theme colors - Background */
+  --theme-bg-primary: #ffffff;
+  --theme-bg-secondary: #fafafa;
+  --theme-bg-tertiary: #f5f5f5;
+  
+  /* Theme colors - Foreground */
+  --theme-fg-primary: #171717;
+  --theme-fg-secondary: #404040;
+  --theme-fg-tertiary: #737373;
+  
+  /* Spacing & Layout */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  
+  /* Shadows - Modern elevation system */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Theme colors - Bubbles */
+  --theme-bubble-primary-from: #6366f1;
+  --theme-bubble-primary-via: #8b5cf6;
+  --theme-bubble-primary-to: #a855f7;
+  --theme-bubble-opinion-from: #818cf8;
+  --theme-bubble-opinion-to: #6366f1;
+  --theme-bubble-pros-from: #10b981;
+  --theme-bubble-pros-to: #059669;
+  --theme-bubble-cons-from: #f43f5e;
+  --theme-bubble-cons-to: #e11d48;
+  
+  /* Theme colors - Accents */
+  --theme-accent-blue: #3b82f6;
+  --theme-accent-purple: #a855f7;
+  --theme-accent-pink: #ec4899;
+  --theme-accent-green: #10b981;
+  --theme-accent-red: #ef4444;
+  --theme-accent-yellow: #fbbf24;
+  --theme-accent-emerald: #10b981;
+  --theme-accent-sky: #0ea5e9;
+  --theme-accent-indigo: #6366f1;
+  --theme-accent-amber: #fbbf24;
+  --theme-accent-orange: #f97316;
+  --theme-accent-cyan: #06b6d4;
+  
+  /* Theme colors - Badges */
+  --theme-badge-sophisticated-bg: rgba(16, 185, 129, 0.8);
+  --theme-badge-sophisticated-text: #065f46;
+  --theme-badge-sophisticated-bg-dark: rgba(16, 185, 129, 0.2);
+  --theme-badge-sophisticated-text-dark: #a7f3d0;
+  --theme-badge-simple-bg: rgba(14, 165, 233, 0.8);
+  --theme-badge-simple-text: #0c4a6e;
+  --theme-badge-simple-bg-dark: rgba(14, 165, 233, 0.2);
+  --theme-badge-simple-text-dark: #bae6fd;
+  --theme-badge-neutral-bg: rgba(148, 163, 184, 0.8);
+  --theme-badge-neutral-text: #334155;
+  --theme-badge-neutral-bg-dark: rgba(148, 163, 184, 0.2);
+  --theme-badge-neutral-text-dark: #cbd5e1;
+  
+  /* Theme colors - Messages */
+  --theme-message-bg: rgba(255, 255, 255, 0.2);
+  --theme-message-bg-dark: rgba(17, 24, 39, 0.2);
+  --theme-message-border: rgba(255, 255, 255, 0.2);
+  --theme-message-border-dark: rgba(255, 255, 255, 0.1);
+  --theme-message-shadow: rgba(59, 130, 246, 0.4);
+  --theme-message-shadow-dark: rgba(59, 130, 246, 0.2);
+  --theme-message-text: #1e293b;
+  --theme-message-text-dark: #f1f5f9;
+  --theme-message-text-secondary: #475569;
+  --theme-message-text-secondary-dark: #cbd5e1;
+  
+  /* Theme colors - Loading */
+  --theme-loading-border: #dbeafe;
+  --theme-loading-border-dark: #1e3a8a;
+  --theme-loading-border-active: #3b82f6;
+  --theme-loading-border-active-dark: #60a5fa;
+  
+  /* Theme colors - Glass */
+  --theme-glass-white: #ffffff;
+  --theme-glass-overlay: rgba(255, 255, 255, 0.8);
+  
+  /* Card gradients - stored as individual colors */
+  --theme-card-gradient-0-from: #0ea5e9;
+  --theme-card-gradient-0-via: #3b82f6;
+  --theme-card-gradient-0-to: #2563eb;
+  --theme-card-gradient-1-from: #a855f7;
+  --theme-card-gradient-1-via: #a855f7;
+  --theme-card-gradient-1-to: #4f46e5;
+  --theme-card-gradient-2-from: #34d399;
+  --theme-card-gradient-2-via: #14b8a6;
+  --theme-card-gradient-2-to: #06b6d4;
+  --theme-card-gradient-3-from: #fbbf24;
+  --theme-card-gradient-3-via: #f97316;
+  --theme-card-gradient-3-to: #f43f5e;
+  --theme-card-gradient-4-from: #ec4899;
+  --theme-card-gradient-4-via: #f43f5e;
+  --theme-card-gradient-4-to: #ef4444;
+  --theme-card-gradient-5-from: #22d3ee;
+  --theme-card-gradient-5-via: #3b82f6;
+  --theme-card-gradient-5-to: #4f46e5;
+  
+  /* Accent rings for cards */
+  --theme-accent-ring-0: rgba(14, 165, 233, 0.3);
+  --theme-accent-ring-1: rgba(168, 85, 247, 0.25);
+  --theme-accent-ring-2: rgba(16, 185, 129, 0.3);
+  --theme-accent-ring-3: rgba(251, 191, 36, 0.25);
+  --theme-accent-ring-4: rgba(236, 72, 153, 0.25);
+  --theme-accent-ring-5: rgba(34, 211, 238, 0.25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    
+    /* Dark theme overrides */
+    --theme-bg-primary: #0a0a0a;
+    --theme-bg-secondary: #171717;
+    --theme-bg-tertiary: #262626;
+    --theme-fg-primary: #ededed;
+    --theme-fg-secondary: #d4d4d4;
+    --theme-fg-tertiary: #a3a3a3;
+    --theme-loading-border: #1e3a8a;
+    --theme-loading-border-active: #60a5fa;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1;
+}
+
+/* Better default link styles */
+a {
+  transition: color var(--transition-base);
+}
+
+/* Improved focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--theme-accent-indigo);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better selection colors */
+::selection {
+  background-color: var(--theme-accent-indigo);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: var(--theme-accent-indigo);
+  color: white;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-bottom-4 {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-top-2 {
+  from {
+    transform: translateY(-0.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-from-bottom-4 {
+  animation: slide-in-from-bottom-4 0.3s ease-out;
+}
+
+.slide-in-from-top-2 {
+  animation: slide-in-from-top-2 0.3s ease-out;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
+  }
+}
+
+@keyframes fadeInBubble {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.slide-in-from-right {
+  animation: slide-in-from-right 0.3s ease-out;
+}
+
+.fade-out {
+  animation: fade-out 0.3s ease-in forwards;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Override Recharts tooltip animation - fade in without transform */
+.recharts-tooltip-wrapper {
+  animation: fadeInTooltip 0.15s ease-out !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+@keyframes fadeInTooltip {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Print styles for report page */
+@media print {
+  @page {
+    margin: 1cm;
+  }
+  
+  /* Prevent page breaks inside important sections */
+  /* .print:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  } */
+  
+  /* Hide unwanted elements */
+  /* .print\\:hidden {
+    display: none !important;
+  } */
+}
