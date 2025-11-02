@@ -243,7 +243,7 @@ export default function MessageStream({ uuid }: MessageStreamProps) {
   const reversedMessages = messages.slice().reverse();
 
   return (
-    <div className="fixed top-4 right-4 z-50 pointer-events-none">
+    <div className="fixed top-20 right-4 z-40 pointer-events-none">
       <div className="relative">
         {reversedMessages.map((message, index) => {
           // Index 0 is the newest message (appears at top)
