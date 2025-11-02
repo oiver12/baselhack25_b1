@@ -129,23 +129,14 @@ export default async function ReportPage({
     console.error(error);
   }
 
-  // Find the best solution only if it's significantly better and meets minimum threshold
+  // Find the best solution (highest approval rating)
   const sortedSolutions = [...reportData.solutions].sort(
     (a, b) => b.approvalPercentage - a.approvalPercentage
   );
   const bestSolution = sortedSolutions[0];
-  const secondBestSolution = sortedSolutions[1];
 
-  // Only highlight as "best" if:
-  // 1. Best solution is at least 40% approval
-  // 2. Best solution is at least 20% better than the second best
-  const bestSolutionId =
-    bestSolution.approvalPercentage >= 40 &&
-    (!secondBestSolution ||
-      bestSolution.approvalPercentage - secondBestSolution.approvalPercentage >=
-        20)
-      ? bestSolution.id
-      : null;
+  // Always highlight the solution with the highest approval rating
+  const bestSolutionId = bestSolution?.id || null;
 
   return (
     <div
