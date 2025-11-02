@@ -162,6 +162,44 @@ For label generation, we identify the messages nearest to this centroid point, e
 
 ---
 
+
+## Deployment
+
+Both the frontend and backend are built and deployed independently.
+
+Currently, everything is hosted on [Sevalla](https://sevalla.com):
+
+- **Backend:**  
+  The backend service is containerized using the provided `Dockerfile` in `code/backend/`.  
+  Deployment steps:
+  1. Build the Docker image:
+     ```bash
+     cd code/backend
+     docker build -t ai-consensus-backend .
+     ```
+  2. Run the container, mapping necessary ports and mounting the `.env`:
+     ```bash
+     docker run --env-file .env -p 8000:8000 ai-consensus-backend
+     ```
+
+- **Frontend:**  
+  The frontend is deployed using [Nixpacks](https://nixpacks.com/), which automatically detects the build environment and serves the app.
+  Deployment steps:
+  1. From `code/frontend/`, use the Nixpacks CLI or Sevalla dashboard to deploy:
+     ```bash
+     cd code/frontend
+     nixpacks build .  # or use the Sevalla UI to trigger a build
+     ```
+     (On Sevalla, Nixpacks deployment is usually triggered automatically on push, no extra config required.)
+
+  2. The frontend will be served over port 3000 by default.
+
+**Note:**  
+- Both services can be redeployed independently.
+- You may point the frontend `.env` or runtime configs to the public API URL if backend runs remotely.
+
+---
+
 ## Challenges and Learnings
 
 * **Semantic clustering design** — Balancing cluster quality with minimal overlap required careful tuning of Agglomerative Clustering parameters and similarity thresholds
