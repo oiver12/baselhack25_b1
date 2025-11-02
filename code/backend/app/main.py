@@ -10,6 +10,12 @@ from app.config import settings
 from app.discord_bot.bot import run_bot
 from app.services.pipeline import periodic_clustering
 from app.services.embedding_cache import get_embeddings_batch
+from app.state import (
+    global_historical_messages, 
+    global_historical_message_ids, 
+    save_all_discord_messages, 
+    save_all_questions
+)
 
 app = FastAPI(title="BaselHack25 Consensus Builder API")
 
@@ -118,14 +124,6 @@ async def startup_event():
                 
                 if new_messages:
                     print(f"\nFetched {len(new_messages)} new messages")
-                    
-                    # Merge with existing cache
-                    from app.state import (
-                        global_historical_messages, 
-                        global_historical_message_ids, 
-                        save_all_discord_messages, 
-                        save_all_questions
-                    )
                     
                     # Add new messages (avoid duplicates)
                     existing_ids = set(global_historical_message_ids)
