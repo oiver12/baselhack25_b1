@@ -91,15 +91,15 @@ export default async function ReportPage({
 
       // Transform API data to match our ReportData structure
       reportData = {
-        question: apiData.question,
-        summary: apiData.summary.description || apiData.summary.summary,
-        opinions: apiData.summary.points.map(
+        question: apiData!.question,
+        summary: apiData!.summary.description || apiData!.summary.summary,
+        opinions: apiData!.summary.points.map(
           (point) =>
             `${point.title}: ${Math.round(
               point.approval_rating * 100
             )}% approval rating`
         ),
-        messagePoints: apiData.results.map((result) => ({
+        messagePoints: apiData!.results.map((result) => ({
           id: result.message_id,
           x: result.x,
           y: result.y,
@@ -113,7 +113,7 @@ export default async function ReportPage({
             | "negative"
             | undefined,
         })),
-        solutions: apiData.summary.points.map((point, idx) => ({
+        solutions: apiData!.summary.points.map((point, idx) => ({
           id: `solution-${idx + 1}`,
           title: point.title,
           description: point.title,

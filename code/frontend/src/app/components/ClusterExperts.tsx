@@ -76,7 +76,6 @@ export default function ClusterExperts({ nobleMessages }: ClusterExpertsProps) {
                   <div
                     className="relative w-20 h-20 rounded-full overflow-hidden ring-4 transition-all duration-300 hover:ring-6"
                     style={{
-                      ringColor: colors.border,
                       boxShadow: `0 8px 16px ${colors.border}40`,
                     }}
                   >
