@@ -47,6 +47,7 @@ async def periodic_clustering():
             
             current_count = len(q.discord_messages)
             
+            print(f"Clustering: Current count: {current_count}, Last count: {last_message_count}")
             # Skip if message count hasn't changed
             if current_count == last_message_count:
                 await asyncio.sleep(interval)
