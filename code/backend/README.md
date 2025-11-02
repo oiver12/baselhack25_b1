@@ -68,6 +68,22 @@ Messages are embedded into high-dimensional semantic space. Agglomerative Cluste
 - `active_question.json` - Current question state
 - `embeddings_cache.json` - Embedding cache
 
+**Why No Database?**
+
+We chose file-based JSON persistence over a database for practical reasons:
+
+1. **Single active question**: The system only tracks one question at a time (`active_question` global variable). No need for querying, indexing, or multi-tenant isolation.
+
+2. **In-memory clustering**: Agglomerative clustering requires repeated iteration over all message embeddings. Keeping data in Python lists/dicts avoids database round-trips during compute-heavy operations.
+
+3. **Simple persistence needs**: Data is saved as full-state snapshots after each operation (see `save_all_questions()` and `save_all_discord_messages()`). JSON files provide crash recovery without transaction complexity.
+
+4. **Hackathon scope**: For BaselHack 2025, avoiding database setup (migrations, connection pooling, ORM) speeds up development. Dataset sizes (hundreds of messages) fit comfortably in memory.
+
+5. **Load-once pattern**: On startup, all data loads into memory (`load_all_discord_messages()`, `load_all_questions()`). Runtime access is pure in-memory lookups—exactly what Python dicts/lists excel at.
+
+JSON files in `data/` serve only for state restoration across restarts. The application operates entirely in-memory for performance.
+
 **Configuration:** Environment variables control clustering thresholds, similarity settings, and Discord integration. See `.env` example above.
 
 ## Tech Stack
