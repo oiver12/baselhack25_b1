@@ -4,7 +4,7 @@ export type Message = {
   profilePicUrl?: string;
 };
 
-export type OpinionClassification = "good" | "neutral" | "bad";
+export type OpinionClassification = "positive" | "neutral" | "negative";
 
 export type SuggestionOpinion = {
   name: string;

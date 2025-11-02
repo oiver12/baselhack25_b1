@@ -6,6 +6,7 @@ from app.state import DiscordMessage, get_active_question, global_historical_mes
 from app.config import settings
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from app.services.embedding_cache import get_embeddings_batch, get_embedding
 
 
 async def check_message_relevance(
@@ -74,16 +75,15 @@ async def analyze_historical_messages_for_question(question: QuestionState) -> N
     from app.state import should_ignore_message_for_cache
     
     relevant_messages = []
-    for msg in candidate_messages:
+    all_embeddings = await get_embeddings_batch([msg.content for msg in candidate_messages], use_cache=True)
+    question_embedding = await get_embedding(question.question, use_cache=True) 
+    question_embedding = question_embedding.reshape(1, -1)
+    for i, msg in enumerate(candidate_messages):
         # Skip meta-messages like !start_discussion commands
         if should_ignore_message_for_cache(msg.content):
             continue
         # Use historical message threshold for old messages
-        is_relevant = await check_message_relevance(
-            msg, 
-            question.question, 
-            threshold=settings.HISTORICAL_MESSAGE_THRESHOLD
-        )
+        is_relevant = cosine_similarity(all_embeddings[i:i+1], question_embedding)[0][0] >= settings.HISTORICAL_MESSAGE_THRESHOLD
         if is_relevant:
             # Set question_id on message
             msg.question_id = question.question_id

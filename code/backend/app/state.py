@@ -98,6 +98,7 @@ class Cluster:
         intra_sim: float = 0.0,
         sentiment_avg: float = 0.0,
         sentiment_std: float = 0.0,
+        noble_message_id: Optional[str] = None,
         created_at: Optional[datetime] = None,
     ):
         self.cluster_id = cluster_id
@@ -108,6 +109,7 @@ class Cluster:
         self.intra_sim = intra_sim
         self.sentiment_avg = sentiment_avg
         self.sentiment_std = sentiment_std
+        self.noble_message_id = noble_message_id  # ID of the most noble message in this cluster
         self.created_at = created_at or datetime.utcnow()
 
 
@@ -125,7 +127,7 @@ class QuestionState:
         self.created_at = created_at
         self.discord_messages: List[DiscordMessage] = []
         self.participants: Dict[str, Participant] = {}
-        # Cache for message classifications (message_content -> "good"/"neutral"/"bad")
+        # Cache for message classifications (message_content -> "positive"/"neutral"/"negative")
         self.message_classifications: Dict[str, str] = {}
         # Cache for excellent message
         self.excellent_message: Optional[str] = None
@@ -266,6 +268,7 @@ def save_all_questions() -> None:
                         "intra_sim": c.intra_sim,
                         "sentiment_avg": c.sentiment_avg,
                         "sentiment_std": c.sentiment_std,
+                        "noble_message_id": c.noble_message_id,
                         "created_at": c.created_at.isoformat() if hasattr(c.created_at, 'isoformat') else str(c.created_at),
                     }
                     for c in active_question.clusters
@@ -348,6 +351,7 @@ def load_all_questions() -> None:
                         intra_sim=c_data.get("intra_sim", 0.0),
                         sentiment_avg=c_data.get("sentiment_avg", 0.0),
                         sentiment_std=c_data.get("sentiment_std", 0.0),
+                        noble_message_id=c_data.get("noble_message_id"),
                         created_at=datetime.fromisoformat(c_data["created_at"]) if c_data.get("created_at") else None,
                     )
                     state.clusters.append(cluster)

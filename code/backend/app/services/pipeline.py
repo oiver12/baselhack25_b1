@@ -15,7 +15,7 @@ async def process_all():
         if not m.classification:
             m.classification = await llm_service.classify_message(m.content)
 
-    good_msgs = [m.content for m in q.discord_messages if m.classification == "good"]
+    good_msgs = [m.content for m in q.discord_messages if m.classification == "positive"]
     q.excellent_message = await llm_service.best_message(good_msgs)
     for m in q.discord_messages:
         m.is_excellent = m.content == q.excellent_message
@@ -54,7 +54,7 @@ async def periodic_clustering():
             
             # Update count and run clustering
             last_message_count = current_count
-            
+            print(f"Clustering: Running with {current_count} messages")
             # Only run if we have at least 4 messages (k=4)
             if current_count >= 4:
                 await cluster_manager.bootstrap_fixed_kmeans()

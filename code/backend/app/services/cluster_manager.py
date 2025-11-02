@@ -141,7 +141,7 @@ async def bootstrap_fixed_kmeans():
                         
                         similarities = cosine_similarity(candidate_emb, existing_label_embs)[0]
                         max_similarity = float(np.max(similarities)) if len(similarities) > 0 else 0.0
-                        
+                        print(f"Max similarity: {max_similarity}")
                         # If too similar (>0.90), retry with harder prompt
                         if max_similarity > 0.90:
                             if attempt < max_attempts - 1:

@@ -1604,7 +1604,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                               </div>
                             )}
                             {/* Plus/Minus indicator - bottom right */}
-                            {child.data.classification === "good" && (
+                            {child.data.classification === "positive" && (
                               <div 
                                 className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg text-white font-bold text-xs"
                                 style={{ backgroundColor: "var(--theme-accent-green)" }}
@@ -1612,7 +1612,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                                 +
                               </div>
                             )}
-                            {child.data.classification === "bad" && (
+                            {child.data.classification === "negative" && (
                               <div 
                                 className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-lg text-white font-bold text-xs"
                                 style={{ backgroundColor: "var(--theme-accent-red)" }}
@@ -1689,7 +1689,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                       </div>
                     )}
                     {/* Plus/Minus indicator */}
-                    {hoveredBubble.data.classification === "good" && (
+                    {hoveredBubble.data.classification === "positive" && (
                       <div 
                         className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white text-white font-bold text-sm"
                         style={{ backgroundColor: "var(--theme-accent-green)" }}
@@ -1697,7 +1697,7 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                         +
                       </div>
                     )}
-                    {hoveredBubble.data.classification === "bad" && (
+                    {hoveredBubble.data.classification === "negative" && (
                       <div 
                         className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white text-white font-bold text-sm"
                         style={{ backgroundColor: "var(--theme-accent-red)" }}
@@ -1719,14 +1719,14 @@ export default function SuggestionsDisplay({ questionId }: SuggestionsDisplayPro
                     <div 
                       className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize"
                       style={{ 
-                        backgroundColor: hoveredBubble.data.classification === "good" 
+                        backgroundColor: hoveredBubble.data.classification === "positive" 
                           ? "rgba(16, 185, 129, 0.1)" 
-                          : hoveredBubble.data.classification === "bad"
+                          : hoveredBubble.data.classification === "negative"
                           ? "rgba(239, 68, 68, 0.1)"
                           : "rgba(100, 100, 100, 0.1)",
-                        color: hoveredBubble.data.classification === "good"
+                        color: hoveredBubble.data.classification === "positive"
                           ? "var(--theme-accent-green)"
-                          : hoveredBubble.data.classification === "bad"
+                          : hoveredBubble.data.classification === "negative"
                           ? "var(--theme-accent-red)"
                           : "var(--theme-fg-tertiary)",
                       }}

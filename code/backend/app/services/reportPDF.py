@@ -4,6 +4,7 @@ PDF Report generation service
 import io
 import base64
 import json
+import html as html_module
 from datetime import datetime
 from typing import List, Dict, Any
 import matplotlib
@@ -104,8 +105,8 @@ def _calculate_statistics(question_state: QuestionState, report_data: Dict) -> D
     unique_users = set(msg.user_id for msg in messages)
     
     # Opinion distribution
-    positive = sum(1 for msg in messages if msg.classification == "good")
-    negative = sum(1 for msg in messages if msg.classification == "bad")
+    positive = sum(1 for msg in messages if msg.classification == "positive")
+    negative = sum(1 for msg in messages if msg.classification == "negative")
     neutral = sum(1 for msg in messages if (msg.classification == "neutral" or not msg.classification))
     
     # Top discussion themes (clusters)
@@ -527,6 +528,114 @@ def _generate_html_report(
                 font-weight: bold;
                 color: #000000;
             }}
+            .experts-section {{
+                margin-top: 12px;
+                margin-bottom: 12px;
+            }}
+            .experts-section h2 {{
+                font-size: 13px;
+                font-weight: bold;
+                margin-bottom: 8px;
+                color: #000000;
+            }}
+            .experts-grid {{
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }}
+            .expert-card {{
+                background: white;
+                border: 1px solid #d1d5db;
+                border-radius: 10px;
+                padding: 8px;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+            .expert-header {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+            }}
+            .expert-avatar {{
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                object-fit: cover;
+                border: 2px solid #3b82f6;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+                font-size: 14px;
+            }}
+            .expert-info {{
+                flex: 1;
+            }}
+            .expert-name {{
+                font-size: 10px;
+                font-weight: bold;
+                color: #000000;
+                margin-bottom: 2px;
+            }}
+            .expert-cluster {{
+                font-size: 7px;
+                color: #6b7280;
+                background: #f3f4f6;
+                padding: 2px 6px;
+                border-radius: 4px;
+                display: inline-block;
+            }}
+            .expert-bullets {{
+                margin-top: 6px;
+                margin-bottom: 6px;
+            }}
+            .expert-bullets h4 {{
+                font-size: 8px;
+                font-weight: 600;
+                color: #4b5563;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            .expert-bullet-item {{
+                display: flex;
+                align-items: start;
+                gap: 4px;
+                margin-bottom: 2px;
+                font-size: 7px;
+                color: #374151;
+                line-height: 1.3;
+            }}
+            .expert-bullet-dot {{
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+                background: #3b82f6;
+                margin-top: 3px;
+                flex-shrink: 0;
+            }}
+            .expert-message {{
+                margin-top: 6px;
+                padding-top: 6px;
+                border-top: 1px solid #e5e7eb;
+            }}
+            .expert-message h4 {{
+                font-size: 8px;
+                font-weight: 600;
+                color: #4b5563;
+                margin-bottom: 3px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            .expert-message-text {{
+                font-size: 7px;
+                color: #6b7280;
+                font-style: italic;
+                line-height: 1.4;
+            }}
             p, span {{
                 color: #374151;
                 font-size: 10px;
@@ -598,6 +707,11 @@ def _generate_html_report(
                 </div>
             </div>
             
+            {_generate_experts_html(report_data.get("noble_messages", {}))}
+        </div>
+        
+        <!-- Page 3: Proposed Solutions -->
+        <div class="page-break">
             <div class="solutions-section">
                 <h2>Proposed Solutions</h2>
                 <div class="solutions-grid">
@@ -712,4 +826,70 @@ def _generate_solutions_html(points: List[Dict]) -> str:
         </div>
         """
     return html
+
+
+def _generate_experts_html(noble_messages: Dict[str, Dict[str, Any]]) -> str:
+    """Generate HTML for cluster experts section"""
+    if not noble_messages:
+        return ""
+    
+    experts = list(noble_messages.values())
+    if not experts:
+        return ""
+    
+    # Color palette matching frontend
+    cluster_colors = [
+        "#3b82f6",  # Blue
+        "#a855f7",  # Purple
+        "#22c55e",  # Green
+        "#f59e0b",  # Amber
+    ]
+    
+    html_content = '<div class="experts-section">'
+    html_content += '<h2>👥 Cluster Experts</h2>'
+    html_content += '<div class="experts-grid">'
+    
+    for index, expert in enumerate(experts):
+        color = cluster_colors[index % len(cluster_colors)]
+        username = expert.get("username", "Unknown")
+        cluster_label = expert.get("cluster_label", expert.get("cluster", ""))
+        profile_pic_url = expert.get("profile_pic_url", "")
+        bullets = expert.get("bulletpoint", [])
+        message_content = expert.get("message_content", "")
+        
+        # Generate avatar HTML (use initial if no image)
+        initial = username[0].upper() if username else "?"
+        
+        # For PDF, we'll use a simpler approach - just use initial in a colored circle
+        # since external images may not work in WeasyPrint
+        avatar_html = f'<div class="expert-avatar" style="border-color: {color}; background: {color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">{initial}</div>'
+        
+        # Generate bullets HTML
+        bullets_html = ""
+        if bullets:
+            for bullet in bullets[:3]:  # Limit to 3 bullets
+                safe_bullet = html_module.escape(bullet)
+                bullets_html += f'<div class="expert-bullet-item"><div class="expert-bullet-dot" style="background: {color};"></div><span>{safe_bullet}</span></div>'
+        
+        # Escape HTML entities for safety
+        safe_username = html_module.escape(username)
+        safe_cluster_label = html_module.escape(cluster_label)
+        safe_message_content = html_module.escape(message_content)
+        
+        html_content += f"""
+        <div class="expert-card">
+            <div class="expert-header">
+                {avatar_html}
+                <div class="expert-info">
+                    <div class="expert-name">{safe_username}</div>
+                    <div class="expert-cluster">{safe_cluster_label}</div>
+                </div>
+            </div>
+            {f'<div class="expert-bullets"><h4>Areas of Expertise</h4>{bullets_html}</div>' if bullets_html else ''}
+            {f'<div class="expert-message"><h4>Representative Message</h4><div class="expert-message-text">&ldquo;{safe_message_content}&rdquo;</div></div>' if message_content else ''}
+        </div>
+        """
+    
+    html_content += '</div></div>'
+    return html_content
 

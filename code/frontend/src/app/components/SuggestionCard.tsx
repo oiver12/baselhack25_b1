@@ -35,14 +35,14 @@ const classificationBadges: Record<
   Suggestion["peopleOpinions"][number]["classification"],
   { label: string; style: CSSProperties }
 > = {
-  good: {
+  positive: {
     label: "Deep dive",
     style: {
       backgroundColor: "var(--theme-badge-sophisticated-bg)",
       color: "var(--theme-badge-sophisticated-text)",
     },
   },
-  bad: {
+  negative: {
     label: "Quick take",
     style: {
       backgroundColor: "var(--theme-badge-simple-bg)",

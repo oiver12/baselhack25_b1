@@ -5,6 +5,7 @@ import MessageClusterPlot from "@/app/components/MessageClusterPlot";
 import SolutionCard from "@/app/components/SolutionCard";
 import ReportInsights from "@/app/components/ReportInsights";
 import PrintButton from "@/app/components/PrintButton";
+import ClusterExperts from "@/app/components/ClusterExperts";
 import { mockReportData } from "@/lib/mockReportData";
 
 interface ReportPageProps {
@@ -39,25 +40,46 @@ interface ReportApiResponse {
       approval_rating: number;
     }>;
   };
+  noble_messages?: Record<
+    string,
+    {
+      cluster: string;
+      message_content: string;
+      username: string;
+      bulletpoint: string[];
+      profile_pic_url: string;
+      cluster_label: string;
+    }
+  >;
 }
 
-export default async function ReportPage({ params, searchParams }: ReportPageProps) {
+export default async function ReportPage({
+  params,
+  searchParams,
+}: ReportPageProps) {
   const { uuid } = await params;
   const { uuid: key } = await searchParams;
- 
+
   // Fetch report data from backend API
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
   let reportData = mockReportData;
+  let apiData: ReportApiResponse | null = null;
 
   try {
-    const response = await fetch(`${backendUrl}/api/report/${uuid}?key=${key}`, {
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${backendUrl}/api/report/${uuid}?key=${key}`,
+      {
+        cache: "no-store",
+      }
+    );
     console.log(response);
     if (response.status === 401) {
       return (
         <div className="min-h-screen flex flex-col justify-center items-center bg-white">
-          <h1 className="text-4xl font-bold text-red-600 mb-4">401 Unauthorized</h1>
+          <h1 className="text-4xl font-bold text-red-600 mb-4">
+            401 Unauthorized
+          </h1>
           <p className="text-lg text-gray-700 mb-2">
             You are not authorized to view this report.
           </p>
@@ -65,14 +87,17 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
       );
     }
     if (response.ok) {
-      const apiData: ReportApiResponse = await response.json();
-      
+      apiData = await response.json();
+
       // Transform API data to match our ReportData structure
       reportData = {
         question: apiData.question,
         summary: apiData.summary.description || apiData.summary.summary,
-        opinions: apiData.summary.points.map((point) => 
-          `${point.title}: ${Math.round(point.approval_rating * 100)}% approval rating`
+        opinions: apiData.summary.points.map(
+          (point) =>
+            `${point.title}: ${Math.round(
+              point.approval_rating * 100
+            )}% approval rating`
         ),
         messagePoints: apiData.results.map((result) => ({
           id: result.message_id,
@@ -82,7 +107,11 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
           user: result.name,
           profilePicUrl: result.profile_pic_url,
           cluster: result.two_word_summary,
-          classification: result.classification as 'good' | 'neutral' | 'bad' | undefined,
+          classification: result.classification as
+            | "positive"
+            | "neutral"
+            | "negative"
+            | undefined,
         })),
         solutions: apiData.summary.points.map((point, idx) => ({
           id: `solution-${idx + 1}`,
@@ -96,37 +125,37 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     }
   } catch (error) {
     // Silently fall back to mock data on error
-  // INSERT_YOUR_CODE
-  console.error(error);
-
-    
-
-  
-    
+    // INSERT_YOUR_CODE
+    console.error(error);
   }
 
   // Find the best solution only if it's significantly better and meets minimum threshold
-  const sortedSolutions = [...reportData.solutions].sort((a, b) => b.approvalPercentage - a.approvalPercentage);
+  const sortedSolutions = [...reportData.solutions].sort(
+    (a, b) => b.approvalPercentage - a.approvalPercentage
+  );
   const bestSolution = sortedSolutions[0];
   const secondBestSolution = sortedSolutions[1];
-  
+
   // Only highlight as "best" if:
   // 1. Best solution is at least 40% approval
   // 2. Best solution is at least 20% better than the second best
-  const bestSolutionId = (bestSolution.approvalPercentage >= 40 && 
-                         (!secondBestSolution || (bestSolution.approvalPercentage - secondBestSolution.approvalPercentage) >= 20))
-    ? bestSolution.id
-    : null;
+  const bestSolutionId =
+    bestSolution.approvalPercentage >= 40 &&
+    (!secondBestSolution ||
+      bestSolution.approvalPercentage - secondBestSolution.approvalPercentage >=
+        20)
+      ? bestSolution.id
+      : null;
 
   return (
-    <div 
+    <div
       className="min-h-screen relative flex flex-col bg-white print:bg-white"
       style={{
         background: "white",
       }}
     >
       {/* Subtle background pattern - hidden when printing */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.015] pointer-events-none print:hidden"
         style={{
           backgroundImage: `radial-gradient(circle at 2px 2px, var(--theme-fg-primary) 1px, transparent 0)`,
@@ -135,7 +164,7 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
       />
 
       {/* Header */}
-      <header 
+      <header
         className="sticky top-0 z-50 w-full border-b backdrop-blur-xl print:static print:border-b-2 print:bg-white print:backdrop-blur-none"
         style={{
           backgroundColor: "white",
@@ -156,8 +185,8 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            
-            <h1 
+
+            <h1
               className="flex-1 text-center text-lg md:text-xl font-bold text-black print:text-black"
               style={{ color: "#000000" }}
             >
@@ -176,13 +205,17 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
           {/* Report Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 print:hidden">
             <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5" style={{ color: "var(--theme-accent-blue)" }} />
+              <Calendar
+                className="w-5 h-5"
+                style={{ color: "var(--theme-accent-blue)" }}
+              />
               <div>
                 <p className="text-sm" style={{ color: "#6b7280" }}>
-                  Generated on {new Date().toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  Generated on{" "}
+                  {new Date().toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })}
                 </p>
               </div>
@@ -210,9 +243,14 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
             </div>
           </div>
 
+          {/* Cluster Experts Section */}
+          {apiData?.noble_messages && (
+            <ClusterExperts nobleMessages={apiData.noble_messages} />
+          )}
+
           {/* Solutions Section */}
           <div>
-            <h2 
+            <h2
               className="text-2xl font-bold mb-6 text-black print:text-black"
               style={{ color: "#000000" }}
             >
@@ -220,9 +258,9 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:grid-cols-1">
               {reportData.solutions.map((solution) => (
-                <SolutionCard 
-                  key={solution.id} 
-                  solution={solution} 
+                <SolutionCard
+                  key={solution.id}
+                  solution={solution}
                   isBest={solution.id === bestSolutionId}
                 />
               ))}
@@ -233,4 +271,3 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     </div>
   );
 }
-

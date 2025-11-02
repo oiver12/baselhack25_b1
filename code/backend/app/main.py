@@ -9,6 +9,7 @@ from app.api.routes import questions, dashboard, websocket, messages, report
 from app.config import settings
 from app.discord_bot.bot import run_bot
 from app.services.pipeline import periodic_clustering
+from app.services.embedding_cache import get_embeddings_batch
 
 app = FastAPI(title="BaselHack25 Consensus Builder API")
 
@@ -134,7 +135,7 @@ async def startup_event():
                             global_historical_messages.append(msg)
                             global_historical_message_ids.add(msg.message_id)
                             added_count += 1
-                    
+
                     # Save updated cache
                     save_all_discord_messages()
                     save_all_questions()
@@ -148,11 +149,14 @@ async def startup_event():
                 print("="*60)
                 print("STARTUP COMPLETE")
                 print("="*60 + "\n")
+                messages_to_cache = [msg.content for msg in global_historical_messages]
+                await get_embeddings_batch(messages_to_cache)
+                print(f"Cached {len(messages_to_cache)} embeddings")
             except Exception as e:
                 print(f"\nError fetching historical messages: {e}")
                 import traceback
                 traceback.print_exc()
-        
+         
         # Run in background - don't block startup
         asyncio.create_task(fetch_history_background())
     else:

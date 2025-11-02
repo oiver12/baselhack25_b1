@@ -68,7 +68,7 @@ async def get_dashboard_data(question_id: str):
                 "name": msg.username,
                 "profilePicUrl": msg.profile_pic_url,
                 "message": msg.content,
-                "classification": (msg.classification if msg.classification in ["good", "neutral", "bad"] else "neutral"),
+                "classification": (msg.classification if msg.classification in ["positive", "neutral", "negative"] else "neutral"),
                 "isExcellent": bool(getattr(msg, "is_excellent", False)),
             })
 

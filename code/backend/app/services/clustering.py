@@ -18,7 +18,7 @@ def intra_similarity(embeddings: np.ndarray) -> float:
 
 
 def sentiment_metrics(messages) -> dict[str, float]:
-    sentiment_map = {"good": 1, "neutral": 0, "bad": -1}
+    sentiment_map = {"positive": 1, "neutral": 0, "negative": -1}
     vals = [sentiment_map.get(m.classification or "neutral", 0) for m in messages]
     if not vals:
         return {"avg": 0.0, "std": 0.0}

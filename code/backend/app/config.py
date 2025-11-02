@@ -3,7 +3,7 @@ Application configuration
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -28,10 +28,13 @@ class Settings(BaseSettings):
 
     # AI/ML Settings
     OPENAI_API_KEY: str = ""
+    
+    # Prompt Configuration
+    PROMPTS_FILE_PATH: Optional[str] = None  # Path to prompts.json (optional, defaults to backend/prompts.json)
 
     # Message Relevance Thresholds (cosine similarity, 0.0 to 1.0)
     # Threshold for historical messages (before question was asked)
-    HISTORICAL_MESSAGE_THRESHOLD: float = 0.4
+    HISTORICAL_MESSAGE_THRESHOLD: float = 0.2
     # Threshold for new messages (after question is active)
     NEW_MESSAGE_THRESHOLD: float = 0.2
 

@@ -20,8 +20,8 @@ export default function ReportInsights({ messagePoints }: ReportInsightsProps) {
     const uniqueUsers = new Set(messagePoints.map(p => p.user));
     
     const classificationBreakdown = {
-      good: messagePoints.filter(p => p.classification === "good").length,
-      bad: messagePoints.filter(p => p.classification === "bad").length,
+      positive: messagePoints.filter(p => p.classification === "positive").length,
+      negative: messagePoints.filter(p => p.classification === "negative").length,
       neutral: messagePoints.filter(p => p.classification === "neutral").length,
     };
 
@@ -159,7 +159,7 @@ export default function ReportInsights({ messagePoints }: ReportInsightsProps) {
                       className="text-sm font-bold text-black print:text-black"
                       style={{ color: "#000000" }}
                     >
-                      {insights.classificationBreakdown.good}
+                      {insights.classificationBreakdown.positive}
                     </span>
             </div>
             <div className="flex items-center justify-between">
@@ -179,7 +179,7 @@ export default function ReportInsights({ messagePoints }: ReportInsightsProps) {
                       className="text-sm font-bold text-black print:text-black"
                       style={{ color: "#000000" }}
                     >
-                      {insights.classificationBreakdown.bad}
+                      {insights.classificationBreakdown.negative}
                     </span>
             </div>
             <div className="flex items-center justify-between">

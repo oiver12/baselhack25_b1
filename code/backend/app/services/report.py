@@ -81,10 +81,67 @@ async def get_whole_Report(question_state: QuestionState) -> Dict[str, Any]:
     """
     Get the whole report for a question
     """
+    from app.services.noble_message_service import compute_noble_messages_for_clusters
+    
     import asyncio
     results_task = asyncio.create_task(make_2d_plot(question_state))
-    summary_task = asyncio.create_task(generate_bullet_point_summary_with_pros_cons([msg.content for msg in question_state.discord_messages]))
+    summary_task = asyncio.create_task(generate_bullet_point_summary_with_pros_cons(
+        [msg.content for msg in question_state.discord_messages],
+        question=question_state.question
+    ))
+    
+    # Compute noble messages for all clusters
+    await compute_noble_messages_for_clusters(question_state)
+    
     results, summary = await asyncio.gather(results_task, summary_task)
+    
+    # Build noble messages map per cluster with expert information
+    from app.services.noble_message_service import find_cluster_expert, compute_expert_expertise_for_cluster
+    
+    noble_messages: Dict[str, Dict[str, Any]] = {}
+    message_map = {msg.message_id: msg for msg in question_state.discord_messages}
+    
+    for cluster in question_state.clusters:
+        if not cluster.noble_message_id or cluster.noble_message_id not in message_map:
+            continue
+            
+        noble_msg = message_map[cluster.noble_message_id]
+        
+        # Find the expert for this cluster
+        expert = find_cluster_expert(cluster, message_map)
+        
+        if expert:
+            expert_user_id, expert_username = expert
+            # Get expert's profile pic from any of their messages in the cluster
+            expert_profile_pic = ""
+            for msg_id in cluster.message_ids:
+                if msg_id in message_map:
+                    msg = message_map[msg_id]
+                    if msg.user_id == expert_user_id:
+                        expert_profile_pic = msg.profile_pic_url
+                        break
+            
+            # Generate expertise bullet points
+            expertise_bullets = await compute_expert_expertise_for_cluster(cluster, question_state)
+            
+            noble_messages[cluster.label] = {
+                "cluster": cluster.label,
+                "message_content": noble_msg.content,
+                "username": expert_username,
+                "bulletpoint": expertise_bullets or [],
+                "profile_pic_url": expert_profile_pic,
+                "cluster_label": cluster.label,
+            }
+        else:
+            # Fallback if no expert found
+            noble_messages[cluster.label] = {
+                "cluster": cluster.label,
+                "message_content": noble_msg.content,
+                "username": noble_msg.username,
+                "bulletpoint": [],
+                "profile_pic_url": noble_msg.profile_pic_url,
+                "cluster_label": cluster.label,
+            }
     
     # Try to parse JSON, otherwise keep as string
     try:
@@ -96,5 +153,6 @@ async def get_whole_Report(question_state: QuestionState) -> Dict[str, Any]:
     return {
         "results": results,
         "question": question_state.question,
-        "summary": summary_dict
+        "summary": summary_dict,
+        "noble_messages": noble_messages  # Noble message per cluster
     }

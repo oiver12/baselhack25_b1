@@ -26,8 +26,8 @@ interface AnalyticsData {
   averageSize: number;
   excellentCount: number;
   classificationBreakdown: {
-    good: number;
-    bad: number;
+    positive: number;
+    negative: number;
     neutral: number;
   };
   sizeDistribution: {
@@ -87,8 +87,8 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
     );
 
     const classificationBreakdown = {
-      good: allOpinions.filter((o) => o.classification === "good").length,
-      bad: allOpinions.filter((o) => o.classification === "bad").length,
+      positive: allOpinions.filter((o) => o.classification === "positive").length,
+      negative: allOpinions.filter((o) => o.classification === "negative").length,
       neutral: allOpinions.filter((o) => o.classification === "neutral").length,
     };
 
@@ -351,7 +351,7 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
                     className="text-sm font-bold"
                     style={{ color: "var(--theme-fg-primary)" }}
                   >
-                    {analytics.classificationBreakdown.good}
+                    {analytics.classificationBreakdown.positive}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -371,7 +371,7 @@ export default function AnalyticsDashboard({ suggestions, questionText = "How sh
                     className="text-sm font-bold"
                     style={{ color: "var(--theme-fg-primary)" }}
                   >
-                    {analytics.classificationBreakdown.bad}
+                    {analytics.classificationBreakdown.negative}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
